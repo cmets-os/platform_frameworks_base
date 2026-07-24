@@ -29,6 +29,7 @@ import android.os.UserManager
 import android.util.Log
 import com.android.internal.R
 import com.android.settingslib.spaprivileged.framework.common.userManager
+import com.android.settingslib.users.HideUsersUtils
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -109,6 +110,9 @@ internal class AppListRepositoryImplHelper(private val context: Context) {
         userId: Int,
         matchAnyUserForAdmin: Boolean,
     ): List<ApplicationInfo> {
+        // When Hide Users is armed, never expand All apps to other full users.
+        val effectiveMatchAnyUser =
+            matchAnyUserForAdmin && !HideUsersUtils.isFeatureEnabled(context)
         val disabledComponentsFlag =
             (PackageManager.MATCH_DISABLED_COMPONENTS or
                     PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS)
@@ -116,7 +120,7 @@ internal class AppListRepositoryImplHelper(private val context: Context) {
         val archivedPackagesFlag: Long =
             if (isArchivingEnabled()) PackageManager.MATCH_ARCHIVED_PACKAGES else 0L
         val regularFlags = ApplicationInfoFlags.of(disabledComponentsFlag or archivedPackagesFlag)
-        return if (!matchAnyUserForAdmin || !userManager.getUserInfo(userId).isAdmin) {
+        return if (!effectiveMatchAnyUser || !userManager.getUserInfo(userId).isAdmin) {
             packageManager.getInstalledApplicationsAsUser(regularFlags, userId)
         } else {
             coroutineScope {
@@ -232,7 +236,7 @@ internal class AppListRepositoryImplHelper(private val context: Context) {
     }
 }
 
-class AppListRepositoryImpl(context: Context) : AppListRepository {
+class AppListRepositoryImpl(private val context: Context) : AppListRepository {
     private val helper = AppListRepositoryImplHelper(context)
 
     companion object {
@@ -246,6 +250,13 @@ class AppListRepositoryImpl(context: Context) : AppListRepository {
                 }
                 field = value
             }
+
+        /** Clears cached app lists (call when Hide Users is toggled). */
+        @JvmStatic
+        fun clearCaches() {
+            appsCache.clear()
+            homeOrLauncherPackagesCache.clear()
+        }
 
         private val appsCache = ConcurrentHashMap<AppsCacheKey, Deferred<List<ApplicationInfo>>>()
 
@@ -271,12 +282,16 @@ class AppListRepositoryImpl(context: Context) : AppListRepository {
         loadInstantApps: Boolean,
         matchAnyUserForAdmin: Boolean,
     ): List<ApplicationInfo> {
+        // Include hide-users arming in the effective flag so cache keys cannot reuse
+        // stale MATCH_ANY_USER results across enable/disable flips.
+        val effectiveMatchAnyUser =
+            matchAnyUserForAdmin && !HideUsersUtils.isFeatureEnabled(context)
         if (!useCaching) {
-            return helper.loadApps(userId, loadInstantApps, matchAnyUserForAdmin)
+            return helper.loadApps(userId, loadInstantApps, effectiveMatchAnyUser)
         }
-        val key = AppsCacheKey(userId, loadInstantApps, matchAnyUserForAdmin)
+        val key = AppsCacheKey(userId, loadInstantApps, effectiveMatchAnyUser)
         return getOrAsync(appsCache, key) {
-                helper.loadApps(userId, loadInstantApps, matchAnyUserForAdmin)
+                helper.loadApps(userId, loadInstantApps, effectiveMatchAnyUser)
             }
             .await()
     }

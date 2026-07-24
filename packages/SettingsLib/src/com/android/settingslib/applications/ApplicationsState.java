@@ -27,6 +27,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
+import android.database.ContentObserver;
+import android.provider.Settings;
 import android.content.pm.Flags;
 import android.content.pm.IPackageManager;
 import android.content.pm.IPackageStatsObserver;
@@ -64,6 +66,7 @@ import androidx.lifecycle.OnLifecycleEvent;
 import com.android.internal.R;
 import com.android.internal.util.ArrayUtils;
 import com.android.settingslib.Utils;
+import com.android.settingslib.users.HideUsersUtils;
 import com.android.settingslib.utils.ThreadUtils;
 
 import java.io.File;
@@ -810,10 +813,27 @@ public class ApplicationsState {
     }
 
     private int getFlagsForApplicationInfo(int userId) {
-        if (android.multiuser.Flags.dontShowOtherUsersAppsToAdmin()) {
+        // When Hide Users is armed, show only apps installed for the current user/profiles.
+        if (HideUsersUtils.isFeatureEnabled(mContext)
+                || android.multiuser.Flags.dontShowOtherUsersAppsToAdmin()) {
             return mRetrieveFlags;
         } else {
             return mUm.isUserAdmin(userId) ? mAdminRetrieveFlags : mRetrieveFlags;
+        }
+    }
+
+    /**
+     * Forces a rebuild of the app list after Hide Users is toggled so an already-open
+     * All apps session does not keep stale {@link PackageManager#MATCH_ANY_USER} results.
+     */
+    public void rebuildForHideUsersChange() {
+        synchronized (mEntriesMap) {
+            clearEntries();
+            mApplications = new ArrayList<>();
+            if (mResumed) {
+                doPauseLocked();
+                doResumeIfNeededLocked();
+            }
         }
     }
 

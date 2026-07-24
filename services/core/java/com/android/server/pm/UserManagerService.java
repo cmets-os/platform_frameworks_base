@@ -2600,6 +2600,72 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     /**
+     * Opt a user/profile into Shared encrypted storage. Guest users are rejected.
+     */
+    @Override
+    public void setSharedEncryptedStorageEnabled(@UserIdInt int userId, boolean enabled) {
+        checkManageUsersPermission("set shared encrypted storage enabled");
+        final UserInfo userInfo;
+        synchronized (mPackagesLock) {
+            synchronized (mUsersLock) {
+                final UserData data = getUserDataLU(userId);
+                if (data == null || data.info.partial || data.info.preCreated) {
+                    throw new IllegalArgumentException("Invalid user id " + userId);
+                }
+                userInfo = data.info;
+                if (userInfo.isGuest()) {
+                    throw new IllegalArgumentException(
+                            "Guest users cannot use Shared encrypted storage");
+                }
+                if (enabled) {
+                    if (userInfo.isSharedEncryptedStorageEnabled()) {
+                        return;
+                    }
+                    addUserInfoFlags(userInfo, UserInfo.FLAG_SHARED_ENCRYPTED_STORAGE);
+                } else {
+                    if (!userInfo.isSharedEncryptedStorageEnabled()) {
+                        return;
+                    }
+                    removeUserInfoFlags(userInfo, UserInfo.FLAG_SHARED_ENCRYPTED_STORAGE);
+                }
+                writeUserLP(data);
+            }
+        }
+        sendUserInfoChangedBroadcast(userId);
+    }
+
+    @Override
+    public boolean isSharedEncryptedStorageEnabled(@UserIdInt int userId) {
+        final UserInfo userInfo = getUserInfoNoChecks(userId);
+        return userInfo != null && userInfo.isSharedEncryptedStorageEnabled();
+    }
+
+    /**
+     * Clears Shared encrypted storage opt-in for all users (after owner wipe).
+     */
+    @Override
+    public void clearSharedEncryptedStorageFlags() {
+        checkManageUsersPermission("clear shared encrypted storage flags");
+        final ArrayList<Integer> changedUserIds = new ArrayList<>();
+        synchronized (mPackagesLock) {
+            synchronized (mUsersLock) {
+                final int size = mUsers.size();
+                for (int i = 0; i < size; i++) {
+                    final UserData data = mUsers.valueAt(i);
+                    if ((data.info.flags & UserInfo.FLAG_SHARED_ENCRYPTED_STORAGE) != 0) {
+                        removeUserInfoFlags(data.info, UserInfo.FLAG_SHARED_ENCRYPTED_STORAGE);
+                        writeUserLP(data);
+                        changedUserIds.add(data.info.id);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < changedUserIds.size(); i++) {
+            sendUserInfoChangedBroadcast(changedUserIds.get(i));
+        }
+    }
+
+    /**
      * This method is for monitoring flag changes on users flags and invalidate cache relevant to
      * the change. The method add flags and invalidateOnUserInfoFlagChange for the flags which
      * has changed.

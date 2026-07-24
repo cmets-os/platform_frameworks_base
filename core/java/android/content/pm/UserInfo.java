@@ -208,11 +208,19 @@ public class UserInfo implements Parcelable {
      * <p>Set only at Hide Users enable-time snapshot for existing full secondary users.
      * Guest users are never marked. Users created after enable are not marked.
      *
-     * <p>Bit {@code 0x00020000} is reserved for Shared encrypted storage and must not be reused.
-     *
      * @hide
      */
     public static final int FLAG_UI_HIDDEN = 0x00010000;
+
+    /**
+     * User may mount Shared encrypted storage into their emulated view as
+     * {@code /storage/emulated/<userId>/Shared}.
+     *
+     * <p>Opt-in only; never set by default. Guest users must not use this flag.
+     *
+     * @hide
+     */
+    public static final int FLAG_SHARED_ENCRYPTED_STORAGE = 0x00020000;
 
     /**
      * @hide
@@ -234,7 +242,8 @@ public class UserInfo implements Parcelable {
             FLAG_EPHEMERAL_ON_CREATE,
             FLAG_MAIN,
             FLAG_FOR_TESTING,
-            FLAG_UI_HIDDEN
+            FLAG_UI_HIDDEN,
+            FLAG_SHARED_ENCRYPTED_STORAGE
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserInfoFlag {
@@ -462,6 +471,15 @@ public class UserInfo implements Parcelable {
      */
     public boolean isUiHidden() {
         return (flags & FLAG_UI_HIDDEN) != 0;
+    }
+
+    /**
+     * Returns whether this user has opted into Shared encrypted storage.
+     *
+     * @hide
+     */
+    public boolean isSharedEncryptedStorageEnabled() {
+        return (flags & FLAG_SHARED_ENCRYPTED_STORAGE) != 0;
     }
 
     public boolean isInitialized() {

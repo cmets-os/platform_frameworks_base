@@ -171,4 +171,22 @@ interface IUserManager {
      */
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
     void clearHideUsersFlags();
+    /**
+     * Opt a user/profile into Shared encrypted storage (bind of Shared into emulated view).
+     * Guest users are rejected. Default is off.
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
+    void setSharedEncryptedStorageEnabled(int userId, boolean enabled);
+    /**
+     * Returns whether the given user has Shared encrypted storage opt-in enabled.
+     * @hide
+     */
+    boolean isSharedEncryptedStorageEnabled(int userId);
+    /**
+     * Clears Shared encrypted storage opt-in for all users (e.g. after owner wipe).
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
+    void clearSharedEncryptedStorageFlags();
 }

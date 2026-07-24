@@ -5150,6 +5150,50 @@ public class UserManager {
     }
 
     /**
+     * Enables or disables Shared encrypted storage opt-in for the given user/profile.
+     *
+     * <p>When enabled, that user may see {@code /storage/emulated/<userId>/Shared} bound to the
+     * device-wide encrypted Shared tree. Guest users cannot enable this. Default is off.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    public void setSharedEncryptedStorageEnabled(@UserIdInt int userId, boolean enabled) {
+        try {
+            mService.setSharedEncryptedStorageEnabled(userId, enabled);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns whether Shared encrypted storage opt-in is enabled for the given user.
+     *
+     * @hide
+     */
+    public boolean isSharedEncryptedStorageEnabled(@UserIdInt int userId) {
+        try {
+            return mService.isSharedEncryptedStorageEnabled(userId);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears Shared encrypted storage opt-in for all users after an owner wipe.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    public void clearSharedEncryptedStorageFlags() {
+        try {
+            mService.clearSharedEncryptedStorageFlags();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Assigns admin privileges to the user, if such a user exists.
      *
      * <p>Note that this does not alter the user's pre-existing user restrictions.

@@ -7,9 +7,12 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.GosPackageState;
-import android.content.pm.GosPackageStateFlag;
 import android.ext.PackageId;
+import android.ext.settings.app.AswBlockPlayIntegrityApi;
+import android.ext.settings.app.AswSpoofPlayIntegrity;
+import android.ext.settings.app.AswSpoofTelephonyRegion;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -147,6 +150,15 @@ public final class IntegritySpoofStore {
             Log.e(TAG, "keybox rejected: missing CertificateChain");
             return false;
         }
+        // Require a PEM private key body so corrupt/incomplete imports keep the previous file.
+        if (!text.contains("-----BEGIN") || !text.contains("PRIVATE KEY-----")) {
+            Log.e(TAG, "keybox rejected: missing PEM private key");
+            return false;
+        }
+        if (!text.contains("-----BEGIN CERTIFICATE-----")) {
+            Log.e(TAG, "keybox rejected: missing PEM certificate");
+            return false;
+        }
         return writeAtomicBytes(KEYBOX_PATH, xmlBytes);
     }
 
@@ -199,8 +211,10 @@ public final class IntegritySpoofStore {
     }
 
     /**
-     * Rescan GosPackageState flags, refresh Global any-* markers and keystore enabled_packages
-     * list (client apps with spoof + GMS/Vending when any client is enabled).
+     * Rescan GosPackageState flags across users, refresh Global any-* markers and keystore
+     * {@code enabled_packages} (effective PI spoof clients + GMS/Vending when any client is
+     * enabled). Block PI wins: packages with block enabled are omitted from the keystore list
+     * and do not set the any-PI marker.
      */
     public static void syncPolicy(@NonNull Context ctx) {
         ensureDir();
@@ -208,23 +222,27 @@ public final class IntegritySpoofStore {
         boolean anyTel = false;
         List<String> enabled = new ArrayList<>();
         PackageManager pm = ctx.getPackageManager();
-        List<ApplicationInfo> apps;
-        try {
-            apps = pm.getInstalledApplicationsAsUser(0, UserHandle.myUserId());
-        } catch (Exception e) {
-            Log.e(TAG, "package scan failed", e);
-            apps = List.of();
-        }
-        for (ApplicationInfo ai : apps) {
-            GosPackageState ps = GosPackageState.get(ai.packageName, UserHandle.myUserId());
-            if (ps.hasFlag(GosPackageStateFlag.SPOOF_PLAY_INTEGRITY)) {
-                anyPi = true;
-                if (!enabled.contains(ai.packageName)) {
-                    enabled.add(ai.packageName);
-                }
+        for (int userId : getUserIds(ctx)) {
+            List<ApplicationInfo> apps;
+            try {
+                apps = pm.getInstalledApplicationsAsUser(0, userId);
+            } catch (Exception e) {
+                Log.e(TAG, "package scan failed for user " + userId, e);
+                continue;
             }
-            if (ps.hasFlag(GosPackageStateFlag.SPOOF_TELEPHONY_REGION)) {
-                anyTel = true;
+            for (ApplicationInfo ai : apps) {
+                GosPackageState ps = GosPackageState.get(ai.packageName, userId);
+                // Block wins: only effective spoof counts for markers and keystore injection.
+                if (AswSpoofPlayIntegrity.I.get(ctx, userId, ai, ps)
+                        && !AswBlockPlayIntegrityApi.I.get(ctx, userId, ai, ps)) {
+                    anyPi = true;
+                    if (!enabled.contains(ai.packageName)) {
+                        enabled.add(ai.packageName);
+                    }
+                }
+                if (AswSpoofTelephonyRegion.I.get(ctx, userId, ai, ps)) {
+                    anyTel = true;
+                }
             }
         }
         if (anyPi) {
@@ -263,15 +281,39 @@ public final class IntegritySpoofStore {
         if (am == null) {
             return;
         }
-        try {
-            am.forceStopPackageAsUser(PackageId.GMS_CORE_NAME, UserHandle.myUserId());
-        } catch (Exception e) {
-            Log.w(TAG, "forceStop GMS failed", e);
+        for (int userId : getUserIds(ctx)) {
+            try {
+                am.forceStopPackageAsUser(PackageId.GMS_CORE_NAME, userId);
+            } catch (Exception e) {
+                Log.w(TAG, "forceStop GMS failed user=" + userId, e);
+            }
+            try {
+                am.forceStopPackageAsUser(PackageId.PLAY_STORE_NAME, userId);
+            } catch (Exception e) {
+                Log.w(TAG, "forceStop Vending failed user=" + userId, e);
+            }
+        }
+    }
+
+    @NonNull
+    private static int[] getUserIds(@NonNull Context ctx) {
+        UserManager um = ctx.getSystemService(UserManager.class);
+        if (um == null) {
+            return new int[] { UserHandle.myUserId() };
         }
         try {
-            am.forceStopPackageAsUser(PackageId.PLAY_STORE_NAME, UserHandle.myUserId());
+            List<UserHandle> handles = um.getUserHandles(true);
+            if (handles == null || handles.isEmpty()) {
+                return new int[] { UserHandle.myUserId() };
+            }
+            int[] ids = new int[handles.size()];
+            for (int i = 0; i < handles.size(); i++) {
+                ids[i] = handles.get(i).getIdentifier();
+            }
+            return ids;
         } catch (Exception e) {
-            Log.w(TAG, "forceStop Vending failed", e);
+            Log.w(TAG, "getUserHandles failed", e);
+            return new int[] { UserHandle.myUserId() };
         }
     }
 

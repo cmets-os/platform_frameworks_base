@@ -23,7 +23,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.UserInfo
+import android.database.ContentObserver
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.os.RemoteException
 import android.os.UserHandle
 import android.os.UserManager
@@ -361,6 +364,17 @@ constructor(
                 onBroadcastReceived(intent, previousSelectedUser)
             }
             .launchIn(applicationScope)
+        // USER_INFO_CHANGED covers snapshot flag flips; also watch Global in case no users were
+        // marked (or Dialer disarmed before broadcasts settle) so QS/keyguard refresh without restart.
+        applicationContext.contentResolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.HIDE_USERS),
+            false /* notifyForDescendants */,
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    refreshUsersScheduler.refreshIfNotPaused()
+                }
+            },
+        )
         restartSecondaryService(repository.getSelectedUserInfo().id)
         applicationScope.launch {
             withContext(mainDispatcher) {

@@ -17,9 +17,11 @@
 package com.android.systemui.user.data.repository
 
 import android.content.Context
+import android.database.ContentObserver
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.UserManager
+import android.provider.Settings
 import android.provider.Settings.Global.USER_SWITCHER_ENABLED
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
@@ -95,9 +97,25 @@ constructor(
                 }
             }
 
+        // UMS gates switcher by non-hidden user count; re-query when Hide Users arms/disarms.
+        val hideUsersObserver =
+            object : ContentObserver(bgHandler) {
+                override fun onChange(selfChange: Boolean) {
+                    launch { updateState() }
+                }
+            }
+
         observer.isListening = true
+        context.contentResolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.HIDE_USERS),
+            false /* notifyForDescendants */,
+            hideUsersObserver,
+        )
         updateState()
-        awaitClose { observer.isListening = false }
+        awaitClose {
+            observer.isListening = false
+            context.contentResolver.unregisterContentObserver(hideUsersObserver)
+        }
     }
 
     /** The current user name. */

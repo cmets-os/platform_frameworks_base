@@ -23,14 +23,19 @@ import android.content.pm.Flags
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.ApplicationInfoFlags
 import android.content.pm.ResolveInfo
+import android.database.ContentObserver
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.UserHandle
 import android.os.UserManager
+import android.provider.Settings
 import android.util.Log
 import com.android.internal.R
 import com.android.settingslib.spaprivileged.framework.common.userManager
 import com.android.settingslib.users.HideUsersUtils
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -239,6 +244,10 @@ internal class AppListRepositoryImplHelper(private val context: Context) {
 class AppListRepositoryImpl(private val context: Context) : AppListRepository {
     private val helper = AppListRepositoryImplHelper(context)
 
+    init {
+        ensureHideUsersCacheObserver(context.applicationContext)
+    }
+
     companion object {
         @JvmStatic
         @Volatile
@@ -256,6 +265,24 @@ class AppListRepositoryImpl(private val context: Context) : AppListRepository {
         fun clearCaches() {
             appsCache.clear()
             homeOrLauncherPackagesCache.clear()
+        }
+
+        private val hideUsersObserverRegistered = AtomicBoolean(false)
+
+        /** Drop stale MATCH_ANY_USER cache entries when Hide Users arms/disarms. */
+        private fun ensureHideUsersCacheObserver(appContext: Context) {
+            if (!hideUsersObserverRegistered.compareAndSet(false, true)) {
+                return
+            }
+            appContext.contentResolver.registerContentObserver(
+                Settings.Global.getUriFor(Settings.Global.HIDE_USERS),
+                false /* notifyForDescendants */,
+                object : ContentObserver(Handler(Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) {
+                        clearCaches()
+                    }
+                },
+            )
         }
 
         private val appsCache = ConcurrentHashMap<AppsCacheKey, Deferred<List<ApplicationInfo>>>()

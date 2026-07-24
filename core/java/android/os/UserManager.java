@@ -5121,6 +5121,35 @@ public class UserManager {
     }
 
     /**
+     * Marks existing full secondary users (except guest and {@code currentUserId}) with
+     * {@link UserInfo#FLAG_UI_HIDDEN} when Hide Users is enabled.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    public void markUsersHiddenAtEnable(@UserIdInt int currentUserId) {
+        try {
+            mService.markUsersHiddenAtEnable(currentUserId);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears all {@link UserInfo#FLAG_UI_HIDDEN} marks when Hide Users is disabled.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    public void clearHideUsersFlags() {
+        try {
+            mService.clearHideUsersFlags();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Assigns admin privileges to the user, if such a user exists.
      *
      * <p>Note that this does not alter the user's pre-existing user restrictions.
@@ -6827,6 +6856,9 @@ public class UserManager {
     public static final void invalidateOnUserInfoFlagChange(@UserInfoFlag int flags) {
         if ((flags & UserInfo.FLAG_DISABLED) > 0) {
             invalidateEnabledProfileIds();
+        }
+        if ((flags & UserInfo.FLAG_UI_HIDDEN) > 0) {
+            invalidateCacheOnUserDataChanged();
         }
     }
 

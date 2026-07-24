@@ -2533,6 +2533,70 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     /**
+     * Snapshot-marks existing full secondary users with {@link UserInfo#FLAG_UI_HIDDEN}
+     * when Hide Users is enabled. Guest and {@code currentUserId} are never marked.
+     */
+    @Override
+    public void markUsersHiddenAtEnable(@UserIdInt int currentUserId) {
+        checkManageUsersPermission("mark users hidden at enable");
+        final ArrayList<Integer> changedUserIds = new ArrayList<>();
+        synchronized (mPackagesLock) {
+            synchronized (mUsersLock) {
+                final List<UserInfo> users = getUsers(/* excludeDying= */ true);
+                for (int i = 0; i < users.size(); i++) {
+                    final UserInfo user = users.get(i);
+                    if (!user.isUiSwitchableHumanUser()) {
+                        continue;
+                    }
+                    if (user.isProfile()) {
+                        continue;
+                    }
+                    if (user.isGuest()) {
+                        continue;
+                    }
+                    if (user.id == currentUserId) {
+                        continue;
+                    }
+                    final UserData data = getUserDataLU(user.id);
+                    if (data != null && !user.isUiHidden()) {
+                        addUserInfoFlags(data.info, UserInfo.FLAG_UI_HIDDEN);
+                        writeUserLP(data);
+                        changedUserIds.add(user.id);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < changedUserIds.size(); i++) {
+            sendUserInfoChangedBroadcast(changedUserIds.get(i));
+        }
+    }
+
+    /**
+     * Clears all {@link UserInfo#FLAG_UI_HIDDEN} marks when Hide Users is disabled.
+     */
+    @Override
+    public void clearHideUsersFlags() {
+        checkManageUsersPermission("clear hide users flags");
+        final ArrayList<Integer> changedUserIds = new ArrayList<>();
+        synchronized (mPackagesLock) {
+            synchronized (mUsersLock) {
+                final int size = mUsers.size();
+                for (int i = 0; i < size; i++) {
+                    final UserData data = mUsers.valueAt(i);
+                    if ((data.info.flags & UserInfo.FLAG_UI_HIDDEN) != 0) {
+                        removeUserInfoFlags(data.info, UserInfo.FLAG_UI_HIDDEN);
+                        writeUserLP(data);
+                        changedUserIds.add(data.info.id);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < changedUserIds.size(); i++) {
+            sendUserInfoChangedBroadcast(changedUserIds.get(i));
+        }
+    }
+
+    /**
      * This method is for monitoring flag changes on users flags and invalidate cache relevant to
      * the change. The method add flags and invalidateOnUserInfoFlagChange for the flags which
      * has changed.
@@ -3428,7 +3492,8 @@ public class UserManagerService extends IUserManager.Stub {
         List<UserInfo> aliveUsers = getUsers(/* excludeDying= */ true);
         boolean isAnyAliveUser = false;
         for (UserInfo userInfo : aliveUsers) {
-            if (userInfo.isUiSwitchableHumanUser()) {
+            // Snapshot-hidden users must not keep the switcher visible (would leak count).
+            if (userInfo.isUiSwitchableHumanUser() && !userInfo.isUiHidden()) {
                 if (isAnyAliveUser) {
                     return true;
                 }
@@ -4343,7 +4408,8 @@ public class UserManagerService extends IUserManager.Stub {
                 if (user.userType.equals(userType)
                         && !user.guestToRemove
                         && !mRemovingUserIds.get(user.id)
-                        && !user.preCreated) {
+                        && !user.preCreated
+                        && !user.isUiHidden()) {
                     count++;
                 }
             }
@@ -4503,7 +4569,8 @@ public class UserManagerService extends IUserManager.Stub {
             UserInfo user = mUsers.valueAt(i).info;
             if (!mRemovingUserIds.get(user.id)
                     && isUserTypeSubjectToSwitchableUserMaximum(user)
-                    && !user.preCreated) {
+                    && !user.preCreated
+                    && !user.isUiHidden()) {
                 aliveSwitchableUserCount++;
             }
         }

@@ -159,4 +159,16 @@ interface IUserManager {
     int[] getProfileIdsExcludingHidden(int userId, boolean enabledOnly);
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(anyOf = {android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.MANAGE_HEADLESS_SYSTEM_USER_ALLOWLISTS})")
     void setTemporaryActivitiesAllowlist(String userType, in List<ComponentName> componentNames);
+    /**
+     * Snapshot-mark existing full secondary users with {@code FLAG_UI_HIDDEN} for Hide Users.
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
+    void markUsersHiddenAtEnable(int currentUserId);
+    /**
+     * Clear all {@code FLAG_UI_HIDDEN} marks when Hide Users is disabled.
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
+    void clearHideUsersFlags();
 }

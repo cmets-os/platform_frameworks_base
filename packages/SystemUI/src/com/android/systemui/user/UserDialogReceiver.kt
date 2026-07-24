@@ -29,12 +29,17 @@ constructor(private val userSwitcherInteractor: UserSwitcherInteractor) : Broadc
         private const val TAG = "UserDialogReceiver"
         const val LAUNCH_USER_SWITCHER_DIALOG =
             "com.android.systemui.action.LAUNCH_USER_SWITCHER_DIALOG"
+        /** When true, include Hide Users snapshot-hidden users in the switcher for this session. */
+        const val EXTRA_SHOW_HIDDEN_USERS = "show_hidden_users"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         try {
             when (intent.getAction()) {
                 LAUNCH_USER_SWITCHER_DIALOG -> {
+                    if (intent.getBooleanExtra(EXTRA_SHOW_HIDDEN_USERS, false)) {
+                        userSwitcherInteractor.setShowHiddenUsersSession(true)
+                    }
                     userSwitcherInteractor.showUserSwitcher(null, context)
                 }
                 else -> Log.e(TAG, "Unknown action " + intent.getAction())

@@ -126,20 +126,34 @@ constructor(
             )
 
     private val callbacks = CopyOnWriteArrayList<UserCallback>()
+
+    /**
+     * Temporary session from Dialer secret code to show snapshot-hidden users in the switcher
+     * without disabling Hide Users.
+     */
+    private val showHiddenUsersSession = MutableStateFlow(false)
+
     private val userInfos: Flow<List<UserInfo>> =
-        repository.userInfos.map { userInfos -> userInfos.filter { it.isFull } }
+        combine(repository.userInfos, showHiddenUsersSession) { userInfos, showHidden ->
+            userInfos.filter { userInfo ->
+                userInfo.isFull && (showHidden || !userInfo.isUiHidden)
+            }
+        }
 
     /** List of current on-device users to select from. */
     val users: Flow<List<UserModel>>
         get() =
-            combine(userInfos, repository.selectedUserInfo, repository.userSwitcherSettings) {
+            combine(
                 userInfos,
-                selectedUserInfo,
-                settings ->
+                repository.selectedUserInfo,
+                repository.userSwitcherSettings,
+                showHiddenUsersSession,
+            ) { userInfos, selectedUserInfo, settings, showHidden ->
                 toUserModels(
                     userInfos = userInfos,
                     selectedUserId = selectedUserInfo.id,
-                    isUserSwitcherEnabled = settings.isUserSwitcherEnabled,
+                    // Secret-code session must list all users even if switcher is gated off.
+                    isUserSwitcherEnabled = settings.isUserSwitcherEnabled || showHidden,
                 )
             }
 
@@ -373,6 +387,19 @@ constructor(
 
     fun onDialogDismissed() {
         _dialogDismissRequests.value = null
+        clearShowHiddenUsersSession()
+    }
+
+    /**
+     * Allows the next user switcher presentation to include {@link UserInfo#FLAG_UI_HIDDEN} users.
+     * Cleared when the dialog is dismissed or the user is switched.
+     */
+    fun setShowHiddenUsersSession(allow: Boolean) {
+        showHiddenUsersSession.value = allow
+    }
+
+    fun clearShowHiddenUsersSession() {
+        showHiddenUsersSession.value = false
     }
 
     fun dump(pw: PrintWriter) {
@@ -618,6 +645,7 @@ constructor(
             when (intent.action) {
                 Intent.ACTION_LOCALE_CHANGED -> true
                 Intent.ACTION_USER_SWITCHED -> {
+                    clearShowHiddenUsersSession()
                     dismissDialog()
                     val selectedUserId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, -1)
                     if (previousUserInfo?.id != selectedUserId) {
@@ -708,6 +736,8 @@ constructor(
             !isUserSwitcherEnabled && userInfo.id != selectedUserId -> null
             // We avoid showing disabled users.
             !userInfo.isEnabled -> null
+            // Snapshot-hidden users are already dropped in userInfos unless session allow is on.
+            userInfo.isUiHidden && !showHiddenUsersSession.value -> null
             // We meet the conditions to return the UserModel.
             userInfo.isGuest || userInfo.isUiSwitchableHumanUser() ->
                 toUserModel(userInfo, selectedUserId, canSwitchUsers)

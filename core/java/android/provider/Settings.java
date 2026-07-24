@@ -16073,6 +16073,27 @@ public final class Settings {
         public static final String USER_SWITCHER_ENABLED = "user_switcher_enabled";
 
         /**
+         * Hide Users feature armed. 0 = off, 1 = on.
+         * @hide
+         */
+        @Readable
+        public static final String HIDE_USERS = "hide_users";
+
+        /**
+         * Dialer sequence to disable Hide Users, e.g. "*#8321#".
+         * @hide
+         */
+        @Readable
+        public static final String HIDE_USERS_CODE_DISABLE = "hide_users_code_disable";
+
+        /**
+         * Dialer sequence to open user switcher while Hide Users is on, e.g. "*#8322#".
+         * @hide
+         */
+        @Readable
+        public static final String HIDE_USERS_CODE_SWITCHER = "hide_users_code_switcher";
+
+        /**
          * Webview Data reduction proxy key.
          * @hide
          */

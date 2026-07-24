@@ -2632,6 +2632,11 @@ public class UserManagerService extends IUserManager.Stub {
             }
         }
         sendUserInfoChangedBroadcast(userId);
+        final StorageManagerInternal sm =
+                LocalServices.getService(StorageManagerInternal.class);
+        if (sm != null) {
+            sm.onSharedEncryptedStorageOptInChanged(userId, enabled);
+        }
     }
 
     @Override

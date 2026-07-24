@@ -1288,6 +1288,21 @@ class StorageManagerService extends IStorageManager.Stub
             Slog.wtf(TAG, e);
         }
 
+        // Re-bind Shared for opted-in users once their emulated volume is started and Shared_CE
+        // is unlocked (after user 0 CE unlock).
+        if (isCeStorageUnlocked(UserHandle.USER_SYSTEM)) {
+            try {
+                final UserManager um = mContext.getSystemService(UserManager.class);
+                if (um != null && um.isSharedEncryptedStorageEnabled(userId)) {
+                    mVold.ensureSharedEncryptedStorage();
+                    mVold.unlockSharedEncryptedStorage();
+                    mVold.mountSharedEncryptedStorage(userId);
+                }
+            } catch (Exception e) {
+                Slog.e(TAG, "Failed to mount Shared encrypted storage on user start " + userId, e);
+            }
+        }
+
         mHandler.obtainMessage(H_COMPLETE_UNLOCK_USER, userId, /* arg2 (unusued) */ 0)
                 .sendToTarget();
         if (mRemountCurrentUserVolumesOnUnlock && userId == mCurrentUserId) {
@@ -3410,6 +3425,107 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_USERS)
+    @Override
+    public void destroySharedEncryptedStorage() {
+        super.destroySharedEncryptedStorage_enforcePermission();
+        destroySharedEncryptedStorageInternal();
+    }
+
+    @Override
+    public boolean isSharedEncryptedStorageUnlocked() {
+        return isSharedEncryptedStorageUnlockedInternal();
+    }
+
+    private void onSharedEncryptedStorageOptInChangedInternal(@UserIdInt int userId,
+            boolean enabled) {
+        if (mVold == null) {
+            Slog.w(TAG, "vold not ready for Shared encrypted storage opt-in change");
+            return;
+        }
+        try {
+            if (enabled) {
+                mVold.ensureSharedEncryptedStorage();
+                if (isCeStorageUnlocked(UserHandle.USER_SYSTEM)) {
+                    mVold.unlockSharedEncryptedStorage();
+                    mVold.mountSharedEncryptedStorage(userId);
+                } else {
+                    Slog.i(TAG, "Shared encrypted opt-in for user " + userId
+                            + " queued until user 0 CE unlock");
+                }
+            } else {
+                mVold.unmountSharedEncryptedStorage(userId);
+            }
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed Shared encrypted storage opt-in change for user " + userId, e);
+        }
+    }
+
+    private void unlockSharedEncryptedStorageAfterUser0() {
+        if (mVold == null) {
+            return;
+        }
+        try {
+            mVold.ensureSharedEncryptedStorage();
+            mVold.unlockSharedEncryptedStorage();
+            remountSharedEncryptedForOptedInUsers();
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to unlock Shared encrypted storage after user 0 CE unlock", e);
+        }
+    }
+
+    private void remountSharedEncryptedForOptedInUsers() {
+        if (mVold == null) {
+            return;
+        }
+        final List<UserInfo> users;
+        try {
+            users = mContext.getSystemService(UserManager.class).getUsers(/* excludeDying */ true);
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to list users for Shared encrypted remount", e);
+            return;
+        }
+        for (UserInfo user : users) {
+            if (user == null || !user.isSharedEncryptedStorageEnabled()) {
+                continue;
+            }
+            try {
+                mVold.mountSharedEncryptedStorage(user.id);
+            } catch (Exception e) {
+                Slog.e(TAG, "Failed to mount Shared encrypted storage for user " + user.id, e);
+            }
+        }
+    }
+
+    private void destroySharedEncryptedStorageInternal() {
+        if (mVold == null) {
+            throw new IllegalStateException("vold not ready");
+        }
+        try {
+            mVold.destroySharedEncryptedStorage();
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to destroy Shared encrypted storage", e);
+            throw new RuntimeException(e);
+        }
+        try {
+            mContext.getSystemService(UserManager.class).clearSharedEncryptedStorageFlags();
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to clear Shared encrypted storage flags after wipe", e);
+        }
+    }
+
+    private boolean isSharedEncryptedStorageUnlockedInternal() {
+        if (mVold == null) {
+            return false;
+        }
+        try {
+            return mVold.isSharedEncryptedStorageUnlocked();
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to query Shared encrypted storage unlock state", e);
+            return false;
+        }
+    }
+
     private boolean isSystemUnlocked(int userId) {
         synchronized (mLock) {
             return ArrayUtils.contains(mSystemUnlockedUsers, userId);
@@ -5187,6 +5303,24 @@ class StorageManagerService extends IStorageManager.Stub
             synchronized (mLock) {
                 mCeUnlockedUsers.append(userId);
             }
+            if (userId == UserHandle.USER_SYSTEM) {
+                unlockSharedEncryptedStorageAfterUser0();
+            }
+        }
+
+        @Override
+        public void onSharedEncryptedStorageOptInChanged(@UserIdInt int userId, boolean enabled) {
+            onSharedEncryptedStorageOptInChangedInternal(userId, enabled);
+        }
+
+        @Override
+        public void destroySharedEncryptedStorage() {
+            destroySharedEncryptedStorageInternal();
+        }
+
+        @Override
+        public boolean isSharedEncryptedStorageUnlocked() {
+            return isSharedEncryptedStorageUnlockedInternal();
         }
 
         @Override

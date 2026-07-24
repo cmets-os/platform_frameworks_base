@@ -1649,6 +1649,34 @@ public class StorageManager {
     }
 
     /**
+     * Wipes Shared encrypted storage (owner Settings). Clears all participant binds and
+     * Shared_CE key material.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    public void destroySharedEncryptedStorage() {
+        try {
+            mStorageManager.destroySharedEncryptedStorage();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns whether Shared encrypted storage (Shared_CE) is unlocked.
+     *
+     * @hide
+     */
+    public boolean isSharedEncryptedStorageUnlocked() {
+        try {
+            return mStorageManager.isSharedEncryptedStorageUnlocked();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns true if the user's credential-encrypted (CE) storage is unlocked.
      *
      * @hide

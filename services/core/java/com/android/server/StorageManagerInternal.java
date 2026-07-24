@@ -231,6 +231,22 @@ public abstract class StorageManagerInternal {
     public abstract void unlockCeStorage(@UserIdInt int userId, byte[] secret);
 
     /**
+     * Called when a user/profile toggles Shared encrypted storage opt-in.
+     */
+    public abstract void onSharedEncryptedStorageOptInChanged(@UserIdInt int userId,
+            boolean enabled);
+
+    /**
+     * Wipes Shared encrypted storage key material and directory contents.
+     */
+    public abstract void destroySharedEncryptedStorage();
+
+    /**
+     * Returns whether Shared_CE is currently installed in the kernel.
+     */
+    public abstract boolean isSharedEncryptedStorageUnlocked();
+
+    /**
      * A listener for changes to the cloud provider.
      */
     public interface CloudProviderChangeListener {

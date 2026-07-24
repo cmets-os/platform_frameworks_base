@@ -170,4 +170,14 @@ interface IStorageManager {
      * is returned.
      */
     int getInternalStorageRemainingLifetime() = 99;
+
+    /**
+     * Wipe Shared encrypted storage (owner). Unmounts all participant binds, destroys
+     * Shared_CE key material and directory contents.
+     */
+    @EnforcePermission("MANAGE_USERS")
+    void destroySharedEncryptedStorage() = 100;
+
+    /** Returns whether Shared_CE is currently unlocked (installed in the kernel). */
+    boolean isSharedEncryptedStorageUnlocked() = 101;
 }

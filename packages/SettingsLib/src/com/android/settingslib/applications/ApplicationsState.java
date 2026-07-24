@@ -230,6 +230,16 @@ public class ApplicationsState {
         mRetrieveFlags = PackageManager.MATCH_DISABLED_COMPONENTS |
                 PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS;
 
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Global.getUriFor(Settings.Global.HIDE_USERS),
+                false /* notifyForDescendants */,
+                new ContentObserver(mMainHandler) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        rebuildForHideUsersChange();
+                    }
+                });
+
         if (!Flags.removeHiddenModuleUsage()) {
             final List<ModuleInfo> moduleInfos = mPm.getInstalledModules(0 /* flags */);
             for (ModuleInfo info : moduleInfos) {

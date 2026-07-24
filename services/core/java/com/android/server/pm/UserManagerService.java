@@ -2542,9 +2542,13 @@ public class UserManagerService extends IUserManager.Stub {
         final ArrayList<Integer> changedUserIds = new ArrayList<>();
         synchronized (mPackagesLock) {
             synchronized (mUsersLock) {
-                final List<UserInfo> users = getUsers(/* excludeDying= */ true);
-                for (int i = 0; i < users.size(); i++) {
-                    final UserInfo user = users.get(i);
+                final int size = mUsers.size();
+                for (int i = 0; i < size; i++) {
+                    final UserData data = mUsers.valueAt(i);
+                    final UserInfo user = data.info;
+                    if (user.partial || user.preCreated || mRemovingUserIds.get(user.id)) {
+                        continue;
+                    }
                     if (!user.isUiSwitchableHumanUser()) {
                         continue;
                     }
@@ -2557,8 +2561,7 @@ public class UserManagerService extends IUserManager.Stub {
                     if (user.id == currentUserId) {
                         continue;
                     }
-                    final UserData data = getUserDataLU(user.id);
-                    if (data != null && !user.isUiHidden()) {
+                    if (!user.isUiHidden()) {
                         addUserInfoFlags(data.info, UserInfo.FLAG_UI_HIDDEN);
                         writeUserLP(data);
                         changedUserIds.add(user.id);

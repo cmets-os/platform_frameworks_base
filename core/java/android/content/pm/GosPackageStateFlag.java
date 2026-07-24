@@ -38,6 +38,8 @@ public interface GosPackageStateFlag {
     /** @hide */ int BLOCK_PLAY_INTEGRITY_API = 28;
     /** @hide */ int USE_EXEC_SPAWNING_NON_DEFAULT = 29;
     /** @hide */ int USE_EXEC_SPAWNING = 30;
+    /** @hide */ int SPOOF_PLAY_INTEGRITY = 31;
+    /** @hide */ int SPOOF_TELEPHONY_REGION = 32;
 
     /** @hide */
     @IntDef(value = {
@@ -68,6 +70,8 @@ public interface GosPackageStateFlag {
             BLOCK_PLAY_INTEGRITY_API,
             USE_EXEC_SPAWNING_NON_DEFAULT,
             USE_EXEC_SPAWNING,
+            SPOOF_PLAY_INTEGRITY,
+            SPOOF_TELEPHONY_REGION,
     })
     @Retention(RetentionPolicy.SOURCE)
     @interface Enum {}

@@ -1373,6 +1373,7 @@ public class Instrumentation {
                     .instantiateApplication(cl, className);
         }
         app.attach(context);
+        com.android.internal.util.integrity.IntegrityPropHooks.setProps(context);
         return app;
     }
     

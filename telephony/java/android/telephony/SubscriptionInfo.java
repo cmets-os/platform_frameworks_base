@@ -407,6 +407,11 @@ public class SubscriptionInfo implements Parcelable {
      * @see #getDisplayName()
      */
     public CharSequence getCarrierName() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.operatorName != null && !spoof.operatorName.isEmpty()) {
+            return spoof.operatorName;
+        }
         return mCarrierName;
     }
 
@@ -543,6 +548,11 @@ public class SubscriptionInfo implements Parcelable {
      */
     @Nullable
     public String getMccString() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.mcc != null && !spoof.mcc.isEmpty()) {
+            return spoof.mcc;
+        }
         return mMcc;
     }
 
@@ -551,6 +561,11 @@ public class SubscriptionInfo implements Parcelable {
      */
     @Nullable
     public String getMncString() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.mnc != null && !spoof.mnc.isEmpty()) {
+            return spoof.mnc;
+        }
         return mMnc;
     }
 
@@ -558,7 +573,24 @@ public class SubscriptionInfo implements Parcelable {
      * @return The ISO country code. Empty if not available.
      */
     public String getCountryIso() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.simCountryIso != null && !spoof.simCountryIso.isEmpty()) {
+            return spoof.simCountryIso;
+        }
         return mCountryIso;
+    }
+
+    @Nullable
+    private static android.ext.integrity.IntegritySpoofStore.TelephonySpoof maybeTelephonySpoof() {
+        if (!android.ext.integrity.IntegritySpoofPolicy.isTelephonySpoofEnabledForCaller()) {
+            return null;
+        }
+        Context ctx = android.app.ActivityThread.currentApplication();
+        if (ctx == null) {
+            return null;
+        }
+        return android.ext.integrity.IntegritySpoofStore.getTelephony(ctx);
     }
 
     /**

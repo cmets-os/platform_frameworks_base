@@ -2804,6 +2804,11 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public String getNetworkOperatorName() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.operatorName != null && !spoof.operatorName.isEmpty()) {
+            return spoof.operatorName;
+        }
         return getNetworkOperatorName(getSubId());
     }
 
@@ -2826,6 +2831,11 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public String getNetworkOperator() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.networkOperator != null && !spoof.networkOperator.isEmpty()) {
+            return spoof.networkOperator;
+        }
         return getNetworkOperatorForPhone(getPhoneId());
     }
 
@@ -2852,6 +2862,11 @@ public class TelephonyManager {
      **/
     @UnsupportedAppUsage
     public String getNetworkOperatorForPhone(int phoneId) {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.networkOperator != null && !spoof.networkOperator.isEmpty()) {
+            return spoof.networkOperator;
+        }
         return getTelephonyProperty(phoneId, TelephonyProperties.operator_numeric(), "");
     }
 
@@ -2937,6 +2952,11 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public String getNetworkCountryIso() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.networkCountryIso != null && !spoof.networkCountryIso.isEmpty()) {
+            return spoof.networkCountryIso;
+        }
         return getNetworkCountryIso(getSlotIndex());
     }
 
@@ -2959,6 +2979,11 @@ public class TelephonyManager {
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     @NonNull
     public String getNetworkCountryIso(int slotIndex) {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.networkCountryIso != null && !spoof.networkCountryIso.isEmpty()) {
+            return spoof.networkCountryIso;
+        }
         try {
             if (slotIndex != SubscriptionManager.DEFAULT_SIM_SLOT_INDEX
                     && !SubscriptionManager.isValidSlotIndex(slotIndex)) {
@@ -3954,6 +3979,11 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
     public String getSimOperator() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.simOperator != null && !spoof.simOperator.isEmpty()) {
+            return spoof.simOperator;
+        }
         return getSimOperatorNumeric();
     }
 
@@ -4027,6 +4057,11 @@ public class TelephonyManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getSimOperatorNumericForPhone(int phoneId) {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.simOperator != null && !spoof.simOperator.isEmpty()) {
+            return spoof.simOperator;
+        }
         return getTelephonyProperty(phoneId, TelephonyProperties.icc_operator_numeric(), "");
     }
 
@@ -4039,6 +4074,11 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
     public String getSimOperatorName() {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.operatorName != null && !spoof.operatorName.isEmpty()) {
+            return spoof.operatorName;
+        }
         return getSimOperatorNameForPhone(getPhoneId());
     }
 
@@ -4065,6 +4105,11 @@ public class TelephonyManager {
      */
     @UnsupportedAppUsage
     public String getSimOperatorNameForPhone(int phoneId) {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.operatorName != null && !spoof.operatorName.isEmpty()) {
+            return spoof.operatorName;
+        }
         return getTelephonyProperty(phoneId, TelephonyProperties.icc_operator_alpha(), "");
     }
 
@@ -4080,6 +4125,12 @@ public class TelephonyManager {
         if (android.app.AppGlobals.getInitialPackageId() == android.ext.PackageId.PIXEL_HEALTH) {
             // Body temperature feature is region-locked to US as of version 2224
             return "us";
+        }
+
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoof();
+        if (spoof != null && spoof.simCountryIso != null && !spoof.simCountryIso.isEmpty()) {
+            return spoof.simCountryIso;
         }
 
         return getSimCountryIsoForPhone(getPhoneId());
@@ -4104,7 +4155,30 @@ public class TelephonyManager {
      */
     @UnsupportedAppUsage
     public static String getSimCountryIsoForPhone(int phoneId) {
+        android.ext.integrity.IntegritySpoofStore.TelephonySpoof spoof =
+                maybeTelephonySpoofStatic();
+        if (spoof != null && spoof.simCountryIso != null && !spoof.simCountryIso.isEmpty()) {
+            return spoof.simCountryIso;
+        }
         return getTelephonyProperty(phoneId, TelephonyProperties.icc_operator_iso_country(), "");
+    }
+
+    @Nullable
+    private android.ext.integrity.IntegritySpoofStore.TelephonySpoof maybeTelephonySpoof() {
+        return maybeTelephonySpoofStatic();
+    }
+
+    @Nullable
+    private static android.ext.integrity.IntegritySpoofStore.TelephonySpoof
+            maybeTelephonySpoofStatic() {
+        if (!android.ext.integrity.IntegritySpoofPolicy.isTelephonySpoofEnabledForCaller()) {
+            return null;
+        }
+        Context ctx = android.app.ActivityThread.currentApplication();
+        if (ctx == null) {
+            return null;
+        }
+        return android.ext.integrity.IntegritySpoofStore.getTelephony(ctx);
     }
 
     /**

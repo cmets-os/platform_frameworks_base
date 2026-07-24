@@ -16094,6 +16094,55 @@ public final class Settings {
         public static final String HIDE_USERS_CODE_SWITCHER = "hide_users_code_switcher";
 
         /**
+         * JSON blob of Play Integrity spoof Build props (PIF-compatible fields).
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_PROPS_JSON = "integrity_spoof_props_json";
+
+        /**
+         * JSON blob of telephony region spoof defaults (MCC/MNC/ISO/operator).
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_TELEPHONY_JSON = "integrity_spoof_telephony_json";
+
+        /**
+         * Optional HTTPS URL for manual props.json update.
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_PROPS_URL = "integrity_spoof_props_url";
+
+        /**
+         * 1 when any installed package has SPOOF_PLAY_INTEGRITY (triggers GMS/Vending auto-include).
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_ANY_PI = "integrity_spoof_any_pi";
+
+        /**
+         * 1 when any installed package has SPOOF_TELEPHONY_REGION.
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_ANY_TEL = "integrity_spoof_any_tel";
+
+        /**
+         * 1 when a user-imported keybox.xml is present under /data/misc/integrity_spoof.
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_KEYBOX_PRESENT = "integrity_spoof_keybox_present";
+
+        /**
+         * Wall-clock millis of the last integrity spoof apply/reload.
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_LAST_RELOAD_MS = "integrity_spoof_last_reload_ms";
+
+        /**
          * Webview Data reduction proxy key.
          * @hide
          */

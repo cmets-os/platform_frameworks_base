@@ -26,6 +26,8 @@ import static android.content.pm.GosPackageStateFlag.BLOCK_NATIVE_DEBUGGING;
 import static android.content.pm.GosPackageStateFlag.BLOCK_NATIVE_DEBUGGING_NON_DEFAULT;
 import static android.content.pm.GosPackageStateFlag.BLOCK_NATIVE_DEBUGGING_SUPPRESS_NOTIF;
 import static android.content.pm.GosPackageStateFlag.BLOCK_PLAY_INTEGRITY_API;
+import static android.content.pm.GosPackageStateFlag.SPOOF_PLAY_INTEGRITY;
+import static android.content.pm.GosPackageStateFlag.SPOOF_TELEPHONY_REGION;
 import static android.content.pm.GosPackageStateFlag.CONTACT_SCOPES_ENABLED;
 import static android.content.pm.GosPackageStateFlag.ENABLE_EXPLOIT_PROTECTION_COMPAT_MODE;
 import static android.content.pm.GosPackageStateFlag.FORCE_MEMTAG;
@@ -74,6 +76,8 @@ class GosPackageStatePermissions {
                 PLAY_INTEGRITY_API_USED_AT_LEAST_ONCE,
                 BLOCK_PLAY_INTEGRITY_API,
                 SUPPRESS_PLAY_INTEGRITY_API_NOTIF,
+                SPOOF_PLAY_INTEGRITY,
+                SPOOF_TELEPHONY_REGION,
         };
 
         selfAccessPermission = builder()

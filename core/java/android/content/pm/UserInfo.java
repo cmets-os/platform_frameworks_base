@@ -203,6 +203,18 @@ public class UserInfo implements Parcelable {
     public static final int FLAG_FOR_TESTING = 0x00008000;
 
     /**
+     * Indicates that this user is hidden from UI by the Hide Users feature.
+     *
+     * <p>Set only at Hide Users enable-time snapshot for existing full secondary users.
+     * Guest users are never marked. Users created after enable are not marked.
+     *
+     * <p>Bit {@code 0x00020000} is reserved for Shared encrypted storage and must not be reused.
+     *
+     * @hide
+     */
+    public static final int FLAG_UI_HIDDEN = 0x00010000;
+
+    /**
      * @hide
      */
     @IntDef(flag = true, prefix = "FLAG_", value = {
@@ -221,7 +233,8 @@ public class UserInfo implements Parcelable {
             FLAG_PROFILE,
             FLAG_EPHEMERAL_ON_CREATE,
             FLAG_MAIN,
-            FLAG_FOR_TESTING
+            FLAG_FOR_TESTING,
+            FLAG_UI_HIDDEN
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserInfoFlag {
@@ -440,6 +453,15 @@ public class UserInfo implements Parcelable {
     @TestApi
     public boolean isForTesting() {
         return (flags & FLAG_FOR_TESTING) == FLAG_FOR_TESTING;
+    }
+
+    /**
+     * Returns whether this user is hidden from UI by Hide Users.
+     *
+     * @hide
+     */
+    public boolean isUiHidden() {
+        return (flags & FLAG_UI_HIDDEN) != 0;
     }
 
     public boolean isInitialized() {

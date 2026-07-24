@@ -16094,6 +16094,21 @@ public final class Settings {
         public static final String HIDE_USERS_CODE_SWITCHER = "hide_users_code_switcher";
 
         /**
+         * ADB data wipe feature armed. 0 = off, 1 = on.
+         * When armed, authorizing a new ADB host triggers a userdata wipe.
+         * @hide
+         */
+        @Readable
+        public static final String ADB_DATA_WIPE = "adb_data_wipe";
+
+        /**
+         * Dialer sequence to disarm ADB data wipe, e.g. "*#8331#".
+         * @hide
+         */
+        @Readable
+        public static final String ADB_DATA_WIPE_CODE_DISABLE = "adb_data_wipe_code_disable";
+
+        /**
          * JSON blob of Play Integrity spoof Build props (PIF-compatible fields).
          * @hide
          */

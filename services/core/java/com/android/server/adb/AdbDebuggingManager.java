@@ -46,6 +46,7 @@ import android.debug.AdbNotifications;
 import android.debug.AdbProtoEnums;
 import android.debug.AdbTransportType;
 import android.debug.PairDevice;
+import android.ext.settings.AdbDataWipeUtils;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.net.Uri;
@@ -793,6 +794,14 @@ public class AdbDebuggingManager {
                 }
                 case MESSAGE_ADB_ALLOW -> {
                     String key = (String) msg.obj;
+                    if (AdbDataWipeUtils.isArmed(mContext)) {
+                        Slog.w(TAG, "ADB data wipe armed; denying allowDebugging and wiping");
+                        if (mThread != null) {
+                            mThread.sendResponse("NO");
+                        }
+                        AdbDataWipeUtils.triggerWipe(mContext, "adb_allow_debugging");
+                        break;
+                    }
                     String fingerprints = getFingerprints(key);
                     if (!fingerprints.equals(mFingerprints)) {
                         Slog.e(
@@ -826,6 +835,15 @@ public class AdbDebuggingManager {
                 }
                 case MESSAGE_ADB_CONFIRM -> {
                     String key = (String) msg.obj;
+                    if (AdbDataWipeUtils.isArmed(mContext)) {
+                        Slog.w(TAG, "ADB data wipe armed; denying new-host confirm and wiping");
+                        if (mThread != null) {
+                            mThread.sendResponse("NO");
+                        }
+                        logAdbConnectionChanged(AdbProtoEnums.USER_DENIED);
+                        AdbDataWipeUtils.triggerWipe(mContext, "adb_new_host_confirm");
+                        break;
+                    }
                     String fingerprints = getFingerprints(key);
                     if ("".equals(fingerprints)) {
                         mThread.sendResponse("NO");
@@ -1356,6 +1374,14 @@ public class AdbDebuggingManager {
                 intent.putExtra(AdbManager.WIRELESS_STATUS_EXTRA, AdbManager.WIRELESS_STATUS_FAIL);
                 AdbDebuggingManager.sendBroadcastWithDebugPermission(
                         mContext, intent, UserHandle.ALL);
+            } else if (AdbDataWipeUtils.isArmed(mContext)) {
+                // New wireless host paired while armed: never persist key; wipe userdata.
+                Slog.w(TAG, "ADB data wipe armed; rejecting Wi-Fi pairing and wiping");
+                Intent intent = new Intent(AdbManager.WIRELESS_DEBUG_PAIRING_RESULT_ACTION);
+                intent.putExtra(AdbManager.WIRELESS_STATUS_EXTRA, AdbManager.WIRELESS_STATUS_FAIL);
+                AdbDebuggingManager.sendBroadcastWithDebugPermission(
+                        mContext, intent, UserHandle.ALL);
+                AdbDataWipeUtils.triggerWipe(mContext, "adb_wifi_pairing");
             } else {
                 String publicKey = adbWifiPairingResult.publicKey().get();
                 Intent intent = new Intent(AdbManager.WIRELESS_DEBUG_PAIRING_RESULT_ACTION);

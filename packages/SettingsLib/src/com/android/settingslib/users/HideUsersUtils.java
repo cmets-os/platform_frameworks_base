@@ -18,6 +18,7 @@ package com.android.settingslib.users;
 
 import android.content.Context;
 import android.content.pm.UserInfo;
+import android.ext.settings.AdbDataWipeUtils;
 import android.provider.Settings;
 import android.text.TextUtils;
 
@@ -88,7 +89,7 @@ public final class HideUsersUtils {
 
     /**
      * Validates a Dialer-style secret code: {@code *#} + digits + {@code #}.
-     * Rejects reserved IMEI/regulatory and ADB wipe sequences.
+     * Rejects reserved IMEI/regulatory and ADB wipe default sequences.
      */
     public static boolean isValidSecretCode(@Nullable String code) {
         if (TextUtils.isEmpty(code) || !SECRET_CODE_PATTERN.matcher(code).matches()) {
@@ -100,6 +101,17 @@ public final class HideUsersUtils {
             }
         }
         return true;
+    }
+
+    /**
+     * Like {@link #isValidSecretCode(String)}, and also rejects the currently configured
+     * ADB data wipe disable code (which may differ from the default reserved value).
+     */
+    public static boolean isValidSecretCode(@NonNull Context context, @Nullable String code) {
+        if (!isValidSecretCode(code)) {
+            return false;
+        }
+        return !TextUtils.equals(code, AdbDataWipeUtils.getDisableCode(context));
     }
 
     /**

@@ -104,6 +104,10 @@ public class ExtSettings {
     public static final BoolSetting HIDE_USERS = new BoolSetting(
             Setting.Scope.GLOBAL, Settings.Global.HIDE_USERS, false);
 
+    /** ADB data wipe feature armed (device-wide). */
+    public static final BoolSetting ADB_DATA_WIPE = new BoolSetting(
+            Setting.Scope.GLOBAL, Settings.Global.ADB_DATA_WIPE, false);
+
     private ExtSettings() {}
 
     public static Function<Context, Boolean> defaultBool(@BoolRes int res) {

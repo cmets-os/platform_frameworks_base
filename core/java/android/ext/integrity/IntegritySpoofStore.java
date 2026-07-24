@@ -57,9 +57,10 @@ public final class IntegritySpoofStore {
             Log.w(TAG, "failed to create " + DIR);
             return;
         }
-        // Best-effort permissions; SELinux labels land in a later policy commit.
-        dir.setReadable(true, false);
-        dir.setExecutable(true, false);
+        // Mode 0700 system; SELinux type integrity_spoof_file (system_server create
+        // type_transitions the directory name from system_data_file).
+        dir.setReadable(true, true);
+        dir.setExecutable(true, true);
         dir.setWritable(true, true);
     }
 

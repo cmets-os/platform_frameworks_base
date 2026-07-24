@@ -1950,6 +1950,16 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         if (mFactoryTestMode != FactoryTest.FACTORY_TEST_LOW_LEVEL) {
+            t.traceBegin("EnsureIntegritySpoofStore");
+            try {
+                // Create /data/misc/integrity_spoof with integrity_spoof_file label for
+                // Settings imports and keystore2 attestation injection.
+                android.ext.integrity.IntegritySpoofStore.ensureDir();
+            } catch (Throwable e) {
+                reportWtf("ensuring integrity spoof store", e);
+            }
+            t.traceEnd();
+
             if (!"0".equals(SystemProperties.get("system_init.startmountservice"))) {
                 t.traceBegin("StartStorageManagerService");
                 try {

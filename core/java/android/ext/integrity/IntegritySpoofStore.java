@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.GosPackageState;
+import android.content.res.Resources;
 import android.ext.PackageId;
 import android.ext.settings.app.AswBlockPlayIntegrityApi;
 import android.ext.settings.app.AswSpoofPlayIntegrity;
@@ -16,18 +17,19 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.util.Log;
 
+import com.android.internal.R;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,15 +45,34 @@ public final class IntegritySpoofStore {
 
     public static final String DIR = "/data/misc/gms_attest_cfg";
     public static final String KEYBOX_PATH = DIR + "/keybox.xml";
+    public static final String KEYBOX_SOURCE_PATH = DIR + "/keybox_source";
     public static final String PROPS_PATH = DIR + "/props.json";
     public static final String TELEPHONY_PATH = DIR + "/telephony.json";
     public static final String ENABLED_PACKAGES_PATH = DIR + "/enabled_packages";
     public static final String RELOAD_TOKEN_PATH = DIR + "/reload_token";
 
+    /** Marker value written when ROM seeds the TrickyStore AOSP software keybox. */
+    public static final String KEYBOX_SOURCE_DEFAULT_AOSP_SOFT = "default_aosp_soft";
+    /** Marker value written after a successful Settings/API keybox import. */
+    public static final String KEYBOX_SOURCE_IMPORTED = "imported";
+
+    /**
+     * SHA-256 of TrickyStore 1.4.1 {@code keybox.xml} (AOSP software default).
+     * Provenance: PLAY_INTEGRITY_ATTESTATION_RESIGN_FEATURE.md
+     */
+    public static final String DEFAULT_AOSP_KEYBOX_SHA256 =
+            "57ff10ee68b76aecf7760da9bb3bba621d8509d8196e10a22d89aa8371cbb849";
+
     private IntegritySpoofStore() {
     }
 
     public static void ensureDir() {
+        ensureDirOnly();
+        seedDefaultKeyboxIfAbsent();
+    }
+
+    /** Create the store directory without seeding defaults (avoids write↔seed recursion). */
+    private static void ensureDirOnly() {
         File dir = new File(DIR);
         if (!dir.exists() && !dir.mkdirs()) {
             Log.w(TAG, "failed to create " + DIR);
@@ -67,6 +88,56 @@ public final class IntegritySpoofStore {
     public static boolean isKeyboxPresent() {
         File f = new File(KEYBOX_PATH);
         return f.isFile() && f.length() > 0;
+    }
+
+    /**
+     * @return {@link #KEYBOX_SOURCE_DEFAULT_AOSP_SOFT}, {@link #KEYBOX_SOURCE_IMPORTED},
+     *         or null if no keybox
+     */
+    @Nullable
+    public static String getKeyboxSource() {
+        if (!isKeyboxPresent()) {
+            return null;
+        }
+        String marker = readFileUtf8(KEYBOX_SOURCE_PATH);
+        if (marker != null) {
+            marker = marker.trim();
+            if (!marker.isEmpty()) {
+                return marker;
+            }
+        }
+        // Infer for upgrades that predate the marker file.
+        byte[] bytes = readFileBytes(KEYBOX_PATH);
+        if (bytes != null && DEFAULT_AOSP_KEYBOX_SHA256.equals(sha256Hex(bytes))) {
+            return KEYBOX_SOURCE_DEFAULT_AOSP_SOFT;
+        }
+        return KEYBOX_SOURCE_IMPORTED;
+    }
+
+    public static boolean isDefaultAospSoftKeybox() {
+        return KEYBOX_SOURCE_DEFAULT_AOSP_SOFT.equals(getKeyboxSource());
+    }
+
+    /** Copy ROM-bundled AOSP software keybox only when {@link #KEYBOX_PATH} is absent. */
+    private static void seedDefaultKeyboxIfAbsent() {
+        if (isKeyboxPresent()) {
+            return;
+        }
+        try (InputStream in = Resources.getSystem().openRawResource(
+                R.raw.integrity_spoof_default_keybox)) {
+            byte[] bytes = in.readAllBytes();
+            if (bytes == null || bytes.length == 0) {
+                Log.w(TAG, "default AOSP keybox resource empty");
+                return;
+            }
+            if (!writeAtomicBytesInternal(KEYBOX_PATH, bytes)) {
+                return;
+            }
+            writeAtomicUtf8Internal(KEYBOX_SOURCE_PATH, KEYBOX_SOURCE_DEFAULT_AOSP_SOFT);
+            Log.i(TAG, "seeded default AOSP software keybox (never overwrites user import)");
+        } catch (Exception e) {
+            Log.w(TAG, "default AOSP keybox seed failed", e);
+        }
     }
 
     @Nullable
@@ -91,32 +162,21 @@ public final class IntegritySpoofStore {
 
     public static boolean writeAtomicUtf8(@NonNull String path, @NonNull String content) {
         ensureDir();
-        File target = new File(path);
-        File tmp = new File(path + ".tmp");
-        try (FileOutputStream fos = new FileOutputStream(tmp)) {
-            fos.write(content.getBytes(StandardCharsets.UTF_8));
-            fos.getFD().sync();
-        } catch (IOException e) {
-            Log.e(TAG, "write failed: " + path, e);
-            //noinspection ResultOfMethodCallIgnored
-            tmp.delete();
-            return false;
-        }
-        if (!tmp.renameTo(target)) {
-            Log.e(TAG, "rename failed: " + path);
-            //noinspection ResultOfMethodCallIgnored
-            tmp.delete();
-            return false;
-        }
-        //noinspection ResultOfMethodCallIgnored
-        target.setReadable(true, true);
-        //noinspection ResultOfMethodCallIgnored
-        target.setWritable(true, true);
-        return true;
+        return writeAtomicUtf8Internal(path, content);
     }
 
     public static boolean writeAtomicBytes(@NonNull String path, @NonNull byte[] content) {
         ensureDir();
+        return writeAtomicBytesInternal(path, content);
+    }
+
+    private static boolean writeAtomicUtf8Internal(@NonNull String path, @NonNull String content) {
+        ensureDirOnly();
+        return writeAtomicBytesInternal(path, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean writeAtomicBytesInternal(@NonNull String path, @NonNull byte[] content) {
+        ensureDirOnly();
         File target = new File(path);
         File tmp = new File(path + ".tmp");
         try (FileOutputStream fos = new FileOutputStream(tmp)) {
@@ -160,7 +220,11 @@ public final class IntegritySpoofStore {
             Log.e(TAG, "keybox rejected: missing PEM certificate");
             return false;
         }
-        return writeAtomicBytes(KEYBOX_PATH, xmlBytes);
+        if (!writeAtomicBytes(KEYBOX_PATH, xmlBytes)) {
+            return false;
+        }
+        writeAtomicUtf8(KEYBOX_SOURCE_PATH, KEYBOX_SOURCE_IMPORTED);
+        return true;
     }
 
     public static boolean importPropsJson(@NonNull Context ctx, @NonNull String json) {
@@ -260,6 +324,10 @@ public final class IntegritySpoofStore {
                 Settings.Global.INTEGRITY_SPOOF_ANY_TEL, anyTel ? 1 : 0);
         Settings.Global.putInt(ctx.getContentResolver(),
                 Settings.Global.INTEGRITY_SPOOF_KEYBOX_PRESENT, isKeyboxPresent() ? 1 : 0);
+        String keyboxSource = getKeyboxSource();
+        Settings.Global.putString(ctx.getContentResolver(),
+                Settings.Global.INTEGRITY_SPOOF_KEYBOX_SOURCE,
+                keyboxSource != null ? keyboxSource : "");
 
         StringBuilder sb = new StringBuilder();
         for (String pkg : enabled) {
@@ -320,24 +388,38 @@ public final class IntegritySpoofStore {
 
     @Nullable
     public static String readFileUtf8(@NonNull String path) {
+        byte[] bytes = readFileBytes(path);
+        if (bytes == null) {
+            return null;
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    @Nullable
+    public static byte[] readFileBytes(@NonNull String path) {
         File f = new File(path);
         if (!f.isFile()) {
             return null;
         }
-        try (InputStream in = new FileInputStream(f);
-             BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (sb.length() > 0) {
-                    sb.append('\n');
-                }
-                sb.append(line);
-            }
-            return sb.toString();
+        try (InputStream in = new FileInputStream(f)) {
+            return in.readAllBytes();
         } catch (IOException e) {
             Log.w(TAG, "read failed: " + path, e);
             return null;
+        }
+    }
+
+    @NonNull
+    private static String sha256Hex(@NonNull byte[] data) {
+        try {
+            byte[] dig = MessageDigest.getInstance("SHA-256").digest(data);
+            StringBuilder sb = new StringBuilder(dig.length * 2);
+            for (byte b : dig) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
         }
     }
 

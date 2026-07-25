@@ -16144,11 +16144,20 @@ public final class Settings {
         public static final String INTEGRITY_SPOOF_ANY_TEL = "integrity_spoof_any_tel";
 
         /**
-         * 1 when a user-imported keybox.xml is present under /data/misc/gms_attest_cfg.
+         * 1 when a keybox.xml is present under /data/misc/gms_attest_cfg
+         * (ROM-seeded AOSP software default or user-imported).
          * @hide
          */
         @Readable
         public static final String INTEGRITY_SPOOF_KEYBOX_PRESENT = "integrity_spoof_keybox_present";
+
+        /**
+         * Keybox origin marker: {@code default_aosp_soft}, {@code imported}, or empty if absent.
+         * Soft default is for resign plumbing/lab only — not a DEVICE/STRONG/GPay promise.
+         * @hide
+         */
+        @Readable
+        public static final String INTEGRITY_SPOOF_KEYBOX_SOURCE = "integrity_spoof_keybox_source";
 
         /**
          * Wall-clock millis of the last integrity spoof apply/reload.

@@ -1952,7 +1952,7 @@ public final class SystemServer implements Dumpable {
         if (mFactoryTestMode != FactoryTest.FACTORY_TEST_LOW_LEVEL) {
             t.traceBegin("EnsureIntegritySpoofStore");
             try {
-                // Create /data/misc/integrity_spoof with integrity_spoof_file label for
+                // Create /data/misc/gms_attest_cfg with gms_attest_cfg_file label for
                 // Settings imports and keystore2 attestation injection.
                 android.ext.integrity.IntegritySpoofStore.ensureDir();
             } catch (Throwable e) {

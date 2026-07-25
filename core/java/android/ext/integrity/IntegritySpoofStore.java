@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Hot-updatable Play Integrity / telephony spoof store under {@code /data/misc/integrity_spoof}.
+ * Hot-updatable Play Integrity / telephony spoof store under {@code /data/misc/gms_attest_cfg}.
  * Props and telephony defaults are mirrored into {@link Settings.Global} for app-process reads.
  * Keybox material stays file-only for keystore2.
  *
@@ -41,7 +41,7 @@ import java.util.List;
 public final class IntegritySpoofStore {
     private static final String TAG = "IntegritySpoofStore";
 
-    public static final String DIR = "/data/misc/integrity_spoof";
+    public static final String DIR = "/data/misc/gms_attest_cfg";
     public static final String KEYBOX_PATH = DIR + "/keybox.xml";
     public static final String PROPS_PATH = DIR + "/props.json";
     public static final String TELEPHONY_PATH = DIR + "/telephony.json";
@@ -57,7 +57,7 @@ public final class IntegritySpoofStore {
             Log.w(TAG, "failed to create " + DIR);
             return;
         }
-        // Mode 0700 system; SELinux type integrity_spoof_file (system_server create
+        // Mode 0700 system; SELinux type gms_attest_cfg_file (system_server create
         // type_transitions the directory name from system_data_file).
         dir.setReadable(true, true);
         dir.setExecutable(true, true);

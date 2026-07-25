@@ -16144,7 +16144,7 @@ public final class Settings {
         public static final String INTEGRITY_SPOOF_ANY_TEL = "integrity_spoof_any_tel";
 
         /**
-         * 1 when a user-imported keybox.xml is present under /data/misc/integrity_spoof.
+         * 1 when a user-imported keybox.xml is present under /data/misc/gms_attest_cfg.
          * @hide
          */
         @Readable

@@ -5150,6 +5150,35 @@ public class UserManager {
     }
 
     /**
+     * Atomically disarms Hide Users: clears Global {@code HIDE_USERS} and all
+     * {@link UserInfo#FLAG_UI_HIDDEN} marks. Intended for Dialer secret-code recovery.
+     *
+     * @hide
+     */
+    public void disarmHideUsers() {
+        try {
+            mService.disarmHideUsers();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Disarms ADB data wipe by clearing Global {@code ADB_DATA_WIPE} only.
+     * Intended for Dialer secret-code recovery; wipe-on-new-host semantics while
+     * armed are unchanged.
+     *
+     * @hide
+     */
+    public void disarmAdbDataWipe() {
+        try {
+            mService.disarmAdbDataWipe();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Enables or disables Shared encrypted storage opt-in for the given user/profile.
      *
      * <p>When enabled, that user may see {@code /storage/emulated/<userId>/Shared} bound to the

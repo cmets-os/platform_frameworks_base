@@ -2580,6 +2580,44 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public void clearHideUsersFlags() {
         checkManageUsersPermission("clear hide users flags");
+        clearHideUsersFlagsInternal();
+    }
+
+    /**
+     * Atomically disarms Hide Users for Dialer secret-code recovery: clears Global
+     * {@link Settings.Global#HIDE_USERS} and all {@link UserInfo#FLAG_UI_HIDDEN} marks.
+     */
+    @Override
+    public void disarmHideUsers() {
+        enforceSecretCodeDisarmPermission("disarm hide users");
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.HIDE_USERS, 0);
+            clearHideUsersFlagsInternal();
+            Slog.i(LOG_TAG, "Hide Users disarmed via secret-code API");
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    /**
+     * Disarms ADB data wipe for Dialer secret-code recovery by clearing
+     * {@link Settings.Global#ADB_DATA_WIPE} only.
+     */
+    @Override
+    public void disarmAdbDataWipe() {
+        enforceSecretCodeDisarmPermission("disarm adb data wipe");
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            Settings.Global.putInt(mContext.getContentResolver(),
+                    Settings.Global.ADB_DATA_WIPE, 0);
+            Slog.i(LOG_TAG, "ADB data wipe disarmed via secret-code API");
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    private void clearHideUsersFlagsInternal() {
         final ArrayList<Integer> changedUserIds = new ArrayList<>();
         synchronized (mPackagesLock) {
             synchronized (mUsersLock) {
@@ -2597,6 +2635,27 @@ public class UserManagerService extends IUserManager.Stub {
         for (int i = 0; i < changedUserIds.size(); i++) {
             sendUserInfoChangedBroadcast(changedUserIds.get(i));
         }
+    }
+
+    /**
+     * Allows {@code com.android.dialer} (secret-code front-end) or callers with
+     * {@link Manifest.permission#MANAGE_USERS} to invoke narrow disarm APIs.
+     */
+    private void enforceSecretCodeDisarmPermission(String message) {
+        if (hasManageUsersPermission()) {
+            return;
+        }
+        final int callingUid = Binder.getCallingUid();
+        final String[] packages = mContext.getPackageManager().getPackagesForUid(callingUid);
+        if (packages != null) {
+            for (String pkg : packages) {
+                if ("com.android.dialer".equals(pkg)) {
+                    return;
+                }
+            }
+        }
+        throw new SecurityException(
+                "Only com.android.dialer or MANAGE_USERS permission may: " + message);
     }
 
     /**

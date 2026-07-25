@@ -172,6 +172,19 @@ interface IUserManager {
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MANAGE_USERS)")
     void clearHideUsersFlags();
     /**
+     * Atomically disarm Hide Users: clear Global {@code HIDE_USERS} and all
+     * {@code FLAG_UI_HIDDEN} marks. Callable by {@code com.android.dialer} or
+     * callers with {@code MANAGE_USERS}.
+     * @hide
+     */
+    void disarmHideUsers();
+    /**
+     * Disarm ADB data wipe by clearing Global {@code ADB_DATA_WIPE} only.
+     * Callable by {@code com.android.dialer} or callers with {@code MANAGE_USERS}.
+     * @hide
+     */
+    void disarmAdbDataWipe();
+    /**
      * Opt a user/profile into Shared encrypted storage (bind of Shared into emulated view).
      * Guest users are rejected. Default is off.
      * @hide

@@ -41,14 +41,6 @@ public final class AdbDataWipeUtils {
 
     public static final String DEFAULT_DISABLE_CODE = "*#8331#";
 
-    /** Reserved for stock IMEI / regulatory and Hide Users Dialer codes. */
-    private static final String[] RESERVED_CODES = {
-            "*#06#",
-            "*#07#",
-            "*#8321#",
-            "*#8322#",
-    };
-
     private static final Pattern SECRET_CODE_PATTERN = Pattern.compile("\\*#[0-9]+#");
 
     private static final AtomicBoolean sWipeStarted = new AtomicBoolean(false);
@@ -68,27 +60,30 @@ public final class AdbDataWipeUtils {
     }
 
     /**
-     * Validates a Dialer-style secret code: {@code *#} + digits + {@code #}.
-     * Rejects stock IMEI/regulatory and Hide Users default sequences.
+     * Validates Dialer-style secret code format: {@code *#} + digits + {@code #}.
      */
     public static boolean isValidSecretCode(@Nullable String code) {
-        if (TextUtils.isEmpty(code) || !SECRET_CODE_PATTERN.matcher(code).matches()) {
-            return false;
-        }
-        return !isReservedConflict(code);
+        return !TextUtils.isEmpty(code) && SECRET_CODE_PATTERN.matcher(code).matches();
     }
 
-    /** Returns true if {@code code} collides with stock or Hide Users reserved sequences. */
-    public static boolean isReservedConflict(@Nullable String code) {
-        if (TextUtils.isEmpty(code)) {
-            return true;
+    /**
+     * Validates format and rejects codes currently reserved by stock IMEI/regulatory or
+     * Hide Users (via {@link SecretCodeRegistry}). The caller's own current disable code
+     * is allowed so re-saving the existing value succeeds.
+     */
+    public static boolean isValidSecretCode(@NonNull Context context, @Nullable String code) {
+        if (!isValidSecretCode(code)) {
+            return false;
         }
-        for (String reserved : RESERVED_CODES) {
-            if (reserved.equals(code)) {
-                return true;
-            }
-        }
-        return false;
+        return !isReservedConflict(context, code);
+    }
+
+    /**
+     * Returns true if {@code code} collides with a currently reserved Dialer secret code
+     * other than this feature's own disable code.
+     */
+    public static boolean isReservedConflict(@NonNull Context context, @Nullable String code) {
+        return SecretCodeRegistry.isReservedConflict(context, code, getDisableCode(context));
     }
 
     /**

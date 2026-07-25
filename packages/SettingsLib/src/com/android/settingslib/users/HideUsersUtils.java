@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 cmets-os
+ * Copyright (C) 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.android.settingslib.users;
 
 import android.content.Context;
 import android.content.pm.UserInfo;
-import android.ext.settings.AdbDataWipeUtils;
+import android.ext.settings.SecretCodeRegistry;
 import android.provider.Settings;
 import android.text.TextUtils;
 
@@ -35,15 +35,10 @@ import java.util.regex.Pattern;
  * @hide
  */
 public final class HideUsersUtils {
-    public static final String DEFAULT_DISABLE_CODE = "*#8321#";
-    public static final String DEFAULT_SWITCHER_CODE = "*#8322#";
-
-    /** Reserved for stock IMEI / regulatory and ADB data wipe disable. */
-    private static final String[] RESERVED_CODES = {
-            "*#06#",
-            "*#07#",
-            "*#8331#",
-    };
+    public static final String DEFAULT_DISABLE_CODE =
+            SecretCodeRegistry.DEFAULT_HIDE_USERS_DISABLE_CODE;
+    public static final String DEFAULT_SWITCHER_CODE =
+            SecretCodeRegistry.DEFAULT_HIDE_USERS_SWITCHER_CODE;
 
     private static final Pattern SECRET_CODE_PATTERN = Pattern.compile("\\*#[0-9]+#");
 
@@ -75,52 +70,43 @@ public final class HideUsersUtils {
 
     @NonNull
     public static String getDisableCode(@NonNull Context context) {
-        final String stored = Settings.Global.getString(context.getContentResolver(),
-                Settings.Global.HIDE_USERS_CODE_DISABLE);
-        return TextUtils.isEmpty(stored) ? DEFAULT_DISABLE_CODE : stored;
+        return SecretCodeRegistry.getHideUsersDisableCode(context);
     }
 
     @NonNull
     public static String getSwitcherCode(@NonNull Context context) {
-        final String stored = Settings.Global.getString(context.getContentResolver(),
-                Settings.Global.HIDE_USERS_CODE_SWITCHER);
-        return TextUtils.isEmpty(stored) ? DEFAULT_SWITCHER_CODE : stored;
+        return SecretCodeRegistry.getHideUsersSwitcherCode(context);
     }
 
     /**
-     * Validates a Dialer-style secret code: {@code *#} + digits + {@code #}.
-     * Rejects reserved IMEI/regulatory and ADB wipe default sequences.
+     * Validates Dialer-style secret code format: {@code *#} + digits + {@code #}.
      */
     public static boolean isValidSecretCode(@Nullable String code) {
-        if (TextUtils.isEmpty(code) || !SECRET_CODE_PATTERN.matcher(code).matches()) {
-            return false;
-        }
-        for (String reserved : RESERVED_CODES) {
-            if (reserved.equals(code)) {
-                return false;
-            }
-        }
-        return true;
+        return !TextUtils.isEmpty(code) && SECRET_CODE_PATTERN.matcher(code).matches();
     }
 
     /**
-     * Like {@link #isValidSecretCode(String)}, and also rejects the currently configured
-     * ADB data wipe disable code (which may differ from the default reserved value).
+     * Validates format and rejects codes currently reserved by stock IMEI/regulatory or
+     * ADB data wipe (via {@link SecretCodeRegistry}). Either of this feature's own current
+     * codes is allowed so re-saving an existing value succeeds; callers still enforce
+     * distinctness between disable and switcher.
      */
     public static boolean isValidSecretCode(@NonNull Context context, @Nullable String code) {
         if (!isValidSecretCode(code)) {
             return false;
         }
-        return !TextUtils.equals(code, AdbDataWipeUtils.getDisableCode(context));
+        return !SecretCodeRegistry.isReservedConflict(context, code,
+                getDisableCode(context), getSwitcherCode(context));
     }
 
     /**
-     * Returns true if {@code disableCode} and {@code switcherCode} are both valid and distinct.
+     * Returns true if {@code disableCode} and {@code switcherCode} are both valid (against
+     * currently reserved codes) and distinct.
      */
-    public static boolean areCodesValidAndDistinct(
+    public static boolean areCodesValidAndDistinct(@NonNull Context context,
             @Nullable String disableCode, @Nullable String switcherCode) {
-        return isValidSecretCode(disableCode)
-                && isValidSecretCode(switcherCode)
+        return isValidSecretCode(context, disableCode)
+                && isValidSecretCode(context, switcherCode)
                 && !TextUtils.equals(disableCode, switcherCode);
     }
 }

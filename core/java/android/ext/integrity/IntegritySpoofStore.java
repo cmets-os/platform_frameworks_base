@@ -22,6 +22,7 @@ import com.android.internal.R;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -30,7 +31,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -116,6 +121,55 @@ public final class IntegritySpoofStore {
 
     public static boolean isDefaultAospSoftKeybox() {
         return KEYBOX_SOURCE_DEFAULT_AOSP_SOFT.equals(getKeyboxSource());
+    }
+
+    /**
+     * True when the keybox ECDSA {@code Key} block's first certificate (signing cert) is past
+     * {@code notAfter}. Used so Settings can warn when the TrickyStore AOSP soft ECDSA
+     * intermediate is expired even if RSA material remains usable for resign fallback.
+     */
+    public static boolean isEcdsaSigningCertExpired() {
+        if (!isKeyboxPresent()) {
+            return false;
+        }
+        String xml = readFileUtf8(KEYBOX_PATH);
+        if (xml == null || xml.isEmpty()) {
+            return false;
+        }
+        Date notAfter = getEcdsaSigningCertNotAfter(xml);
+        return notAfter != null && notAfter.before(new Date());
+    }
+
+    @Nullable
+    private static Date getEcdsaSigningCertNotAfter(@NonNull String xml) {
+        final String open = "<Key algorithm=\"ecdsa\">";
+        int start = xml.indexOf(open);
+        if (start < 0) {
+            return null;
+        }
+        int end = xml.indexOf("</Key>", start);
+        if (end < 0) {
+            return null;
+        }
+        String section = xml.substring(start, end);
+        int pemStart = section.indexOf("-----BEGIN CERTIFICATE-----");
+        int pemEnd = section.indexOf("-----END CERTIFICATE-----");
+        if (pemStart < 0 || pemEnd < 0 || pemEnd <= pemStart) {
+            return null;
+        }
+        String pemBody = section.substring(
+                pemStart + "-----BEGIN CERTIFICATE-----".length(), pemEnd);
+        String b64 = pemBody.replaceAll("\\s+", "");
+        try {
+            byte[] der = Base64.getDecoder().decode(b64);
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            X509Certificate cert = (X509Certificate) cf.generateCertificate(
+                    new ByteArrayInputStream(der));
+            return cert.getNotAfter();
+        } catch (Exception e) {
+            Log.w(TAG, "failed to parse ECDSA signing cert notAfter", e);
+            return null;
+        }
     }
 
     /** Copy ROM-bundled AOSP software keybox only when {@link #KEYBOX_PATH} is absent. */

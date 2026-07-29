@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.GosPackageState;
-import android.content.res.Resources;
 import android.ext.PackageId;
 import android.ext.settings.app.AswBlockPlayIntegrityApi;
 import android.ext.settings.app.AswSpoofPlayIntegrity;
@@ -16,8 +15,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.util.Log;
-
-import com.android.internal.R;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -177,9 +174,8 @@ public final class IntegritySpoofStore {
         if (isKeyboxPresent()) {
             return;
         }
-        try (InputStream in = Resources.getSystem().openRawResource(
-                R.raw.integrity_spoof_default_keybox)) {
-            byte[] bytes = in.readAllBytes();
+        try {
+            byte[] bytes = IntegritySpoofDefaultKeybox.bytes();
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "default AOSP keybox resource empty");
                 return;

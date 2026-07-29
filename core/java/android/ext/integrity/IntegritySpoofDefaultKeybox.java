@@ -1,3 +1,17 @@
+package android.ext.integrity;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * ROM-bundled AOSP software attestation keybox (TrickyStore 1.4.1 soft sample).
+ * Embedded to avoid framework-res R.raw coupling.
+ *
+ * @hide
+ */
+final class IntegritySpoofDefaultKeybox {
+    private IntegritySpoofDefaultKeybox() {}
+
+    static final String XML = """
 <?xml version="1.0"?>
 <AndroidAttestation>
     <NumberOfKeyboxes>1</NumberOfKeyboxes>
@@ -112,3 +126,9 @@
         </Key>
     </Keybox>
 </AndroidAttestation>
+""";
+
+    static byte[] bytes() {
+        return XML.getBytes(StandardCharsets.UTF_8);
+    }
+}

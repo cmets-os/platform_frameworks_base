@@ -128,7 +128,8 @@ prebuilt_etc {
 
 prebuilt_etc {
     name: "privapp_whitelist_com.android.dialer",
-    product_specific: true,
+    // Dialer ships on system_ext (platform_apis); allowlist must match partition.
+    system_ext_specific: true,
     sub_dir: "permissions",
     src: "com.android.dialer.xml",
     filename_from_src: true,

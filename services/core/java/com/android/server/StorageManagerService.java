@@ -735,6 +735,7 @@ class StorageManagerService extends IStorageManager.Stub
     private static final int H_CLOUD_MEDIA_PROVIDER_CHANGED = 16;
     private static final int H_SECURE_KEYGUARD_STATE_CHANGED = 17;
     private static final int H_REMOUNT_VOLUMES_ON_MOVE = 18;
+    private static final int H_RETRY_SHARED_ENCRYPTED_MOUNT = 19;
 
     class StorageManagerServiceHandler extends Handler {
         public StorageManagerServiceHandler(Looper looper) {
@@ -893,6 +894,10 @@ class StorageManagerService extends IStorageManager.Stub
                 }
                 case H_REMOUNT_VOLUMES_ON_MOVE: {
                     remountVolumesForRunningUsersOnMove();
+                    break;
+                }
+                case H_RETRY_SHARED_ENCRYPTED_MOUNT: {
+                    retryMountSharedEncryptedStorage(msg.arg1, msg.arg2);
                     break;
                 }
             }
@@ -1844,6 +1849,11 @@ class StorageManagerService extends IStorageManager.Stub
                     Slog.wtf(TAG, ee);
                 }
                 return;
+            }
+            // Emulated volume is up: attach Shared lower bind if this user opted in
+            // (covers races where opt-in ran before FUSE/media root was ready).
+            if (vol.getType() == VolumeInfo.TYPE_EMULATED && vol.isPrimary()) {
+                maybeMountSharedEncryptedForUser(vol.getMountUserId());
             }
         }
 
@@ -3458,6 +3468,53 @@ class StorageManagerService extends IStorageManager.Stub
             }
         } catch (Exception e) {
             Slog.e(TAG, "Failed Shared encrypted storage opt-in change for user " + userId, e);
+            if (enabled) {
+                mHandler.sendMessageDelayed(
+                        mHandler.obtainMessage(H_RETRY_SHARED_ENCRYPTED_MOUNT, userId, 1),
+                        1500);
+            }
+        }
+    }
+
+    private void maybeMountSharedEncryptedForUser(@UserIdInt int userId) {
+        if (mVold == null || !isCeStorageUnlocked(UserHandle.USER_SYSTEM)) {
+            return;
+        }
+        try {
+            final UserManager um = mContext.getSystemService(UserManager.class);
+            if (um == null || !um.isSharedEncryptedStorageEnabled(userId)) {
+                return;
+            }
+            mVold.ensureSharedEncryptedStorage();
+            mVold.unlockSharedEncryptedStorage();
+            mVold.mountSharedEncryptedStorage(userId);
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed Shared encrypted remount on volume mounted for user " + userId, e);
+            mHandler.sendMessageDelayed(
+                    mHandler.obtainMessage(H_RETRY_SHARED_ENCRYPTED_MOUNT, userId, 1), 1500);
+        }
+    }
+
+    private void retryMountSharedEncryptedStorage(@UserIdInt int userId, int attempt) {
+        if (mVold == null || !isCeStorageUnlocked(UserHandle.USER_SYSTEM)) {
+            return;
+        }
+        try {
+            final UserManager um = mContext.getSystemService(UserManager.class);
+            if (um == null || !um.isSharedEncryptedStorageEnabled(userId)) {
+                return;
+            }
+            mVold.ensureSharedEncryptedStorage();
+            mVold.unlockSharedEncryptedStorage();
+            mVold.mountSharedEncryptedStorage(userId);
+        } catch (Exception e) {
+            if (attempt < 2) {
+                mHandler.sendMessageDelayed(
+                        mHandler.obtainMessage(H_RETRY_SHARED_ENCRYPTED_MOUNT, userId, attempt + 1),
+                        1500);
+            } else {
+                Slog.e(TAG, "Giving up Shared encrypted remount for user " + userId, e);
+            }
         }
     }
 

@@ -2600,6 +2600,30 @@ public class UserManagerService extends IUserManager.Stub {
         }
     }
 
+    private static final String ACTION_LAUNCH_USER_SWITCHER_DIALOG =
+            "com.android.systemui.action.LAUNCH_USER_SWITCHER_DIALOG";
+    private static final String EXTRA_SHOW_HIDDEN_USERS = "show_hidden_users";
+
+    /**
+     * Opens the SystemUI user switcher including snapshot-hidden users without
+     * disarming Hide Users. Dialer secret-code path (no CREATE_USERS on Dialer).
+     */
+    @Override
+    public void requestShowUserSwitcherIncludingHidden() {
+        enforceSecretCodeDisarmPermission("request show user switcher including hidden");
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            final Intent intent = new Intent(ACTION_LAUNCH_USER_SWITCHER_DIALOG);
+            intent.setPackage("com.android.systemui");
+            intent.putExtra(EXTRA_SHOW_HIDDEN_USERS, true);
+            intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            mContext.sendBroadcastAsUser(intent, UserHandle.SYSTEM);
+            Slog.i(LOG_TAG, "Requested user switcher including hidden users");
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
     /**
      * Disarms ADB data wipe for Dialer secret-code recovery by clearing
      * {@link Settings.Global#ADB_DATA_WIPE} only.
@@ -3613,6 +3637,13 @@ public class UserManagerService extends IUserManager.Stub {
             @UserIdInt int userId) {
         if (!isUserSwitcherEnabled(userId)) {
             return false;
+        }
+        // When Hide Users is armed, do not keep the QS/keyguard affordance visible
+        // merely because the user can add another account — that leaks multi-user.
+        // Gate solely on more than one visible switchable human user.
+        if (Settings.Global.getInt(mContext.getContentResolver(),
+                Settings.Global.HIDE_USERS, 0) != 0) {
+            return areThereMultipleUiSwitchableUsers();
         }
         // The feature is enabled. But is it worth showing?
         return showEvenIfNotActionable

@@ -179,6 +179,13 @@ interface IUserManager {
      */
     void disarmHideUsers();
     /**
+     * Show the SystemUI user switcher including snapshot-hidden users without
+     * disarming Hide Users. Callable by {@code com.android.dialer} or callers
+     * with {@code MANAGE_USERS}.
+     * @hide
+     */
+    void requestShowUserSwitcherIncludingHidden();
+    /**
      * Disarm ADB data wipe by clearing Global {@code ADB_DATA_WIPE} only.
      * Callable by {@code com.android.dialer} or callers with {@code MANAGE_USERS}.
      * @hide

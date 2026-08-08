@@ -5164,6 +5164,21 @@ public class UserManager {
     }
 
     /**
+     * Shows the SystemUI user switcher including users marked
+     * {@link UserInfo#FLAG_UI_HIDDEN}, without disarming Hide Users.
+     * Intended for Dialer secret-code recovery.
+     *
+     * @hide
+     */
+    public void requestShowUserSwitcherIncludingHidden() {
+        try {
+            mService.requestShowUserSwitcherIncludingHidden();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Disarms ADB data wipe by clearing Global {@code ADB_DATA_WIPE} only.
      * Intended for Dialer secret-code recovery; wipe-on-new-host semantics while
      * armed are unchanged.

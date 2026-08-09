@@ -424,6 +424,24 @@ class UserSwitcherInteractorTest : SysuiTestCase() {
     }
 
     @Test
+    fun onDialogDismissed_clearsSecretSessionPresentationEnablement() {
+        createUserInteractor()
+        testScope.runTest {
+            userRepository.setSettings(UserSwitcherSettingsModel(isUserSwitcherEnabled = false))
+            underTest.setShowHiddenUsersSession(true)
+            assertThat(underTest.isUserSwitcherEnabledForPresentation()).isTrue()
+
+            // Legacy UserSwitchDialogDelegate dismiss (and coordinator OnDismissListener) route here.
+            underTest.onDialogDismissed()
+            // Idempotent with programmatic dialogDismissRequests path.
+            underTest.onDialogDismissed()
+
+            assertThat(underTest.isShowHiddenUsersSession()).isFalse()
+            assertThat(underTest.isUserSwitcherEnabledForPresentation()).isFalse()
+        }
+    }
+
+    @Test
     fun selectedUser() {
         createUserInteractor()
         testScope.runTest {

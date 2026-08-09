@@ -125,6 +125,15 @@ constructor(
                             )
                     }
                 currentDialog = dialog
+                // User dismiss (Done / outside tap / back) must clear the secret show-hidden
+                // session; programmatic cancel via dialogDismissRequests also hits this listener
+                // (onDialogDismissed is idempotent).
+                dialog.setOnDismissListener {
+                    if (currentDialog === dialog) {
+                        currentDialog = null
+                    }
+                    interactor.get().onDialogDismissed()
+                }
 
                 val controller = request.expandable?.dialogTransitionController(dialogCuj)
                 if (controller != null) {
@@ -156,9 +165,12 @@ constructor(
                 currentDialog?.let {
                     if (it.isShowing) {
                         it.cancel()
+                    } else if (currentDialog === it) {
+                        currentDialog = null
                     }
                 }
 
+                // Safe if OnDismissListener already ran from cancel(); clears session either way.
                 interactor.get().onDialogDismissed()
             }
         }

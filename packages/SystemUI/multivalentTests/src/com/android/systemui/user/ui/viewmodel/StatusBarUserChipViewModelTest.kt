@@ -85,6 +85,7 @@ class StatusBarUserChipViewModelTest : SysuiTestCase() {
     @Mock private lateinit var userLogoutInteractor: UserLogoutInteractor
 
     private lateinit var underTest: StatusBarUserChipViewModel
+    private lateinit var userSwitcherInteractor: UserSwitcherInteractor
 
     private lateinit var userRepository: FakeUserRepository
     private lateinit var guestUserInteractor: GuestUserInteractor
@@ -188,6 +189,40 @@ class StatusBarUserChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun shouldShowChipCriteria_uiHiddenPeerAndSecretSession_staysHidden() =
+        testScope.runTest {
+            val visible =
+                UserInfo(
+                    USER_ID_0,
+                    USER_NAME_0.text!!,
+                    /* iconPath */ "",
+                    /* flags */ UserInfo.FLAG_FULL,
+                    /* userType */ UserManager.USER_TYPE_FULL_SYSTEM,
+                )
+            val hidden =
+                UserInfo(
+                    USER_ID_1,
+                    USER_NAME_1.text!!,
+                    /* iconPath */ "",
+                    /* flags */ UserInfo.FLAG_FULL or UserInfo.FLAG_UI_HIDDEN,
+                    /* userType */ UserManager.USER_TYPE_FULL_SYSTEM,
+                )
+            userRepository.setUserInfos(listOf(visible, hidden))
+            userRepository.setSelectedUserInfo(visible)
+            userRepository.setSettings(UserSwitcherSettingsModel(isUserSwitcherEnabled = true))
+            userSwitcherInteractor.setShowHiddenUsersSession(true)
+
+            var latest: Boolean? = null
+            val job = underTest.isChipVisible.onEach { latest = it }.launchIn(this)
+            yield()
+
+            // Only one non-hidden user — chip must not appear solely due to the secret session.
+            assertThat(latest).isFalse()
+
+            job.cancel()
+        }
+
+    @Test
     fun userChipName_showsSelectedUserInfo() =
         testScope.runTest {
             setMultipleUsers()
@@ -244,37 +279,36 @@ class StatusBarUserChipViewModelTest : SysuiTestCase() {
             userRepository.setUserInfos(listOf(USER_0))
             userRepository.setSelectedUserInfo(USER_0)
         }
-        return StatusBarUserChipViewModel(
-            interactor =
-                UserSwitcherInteractor(
-                    applicationContext = context,
-                    repository = userRepository,
-                    activityStarter = activityStarter,
-                    keyguardInteractor =
-                        KeyguardInteractorFactory.create(
-                                context = context,
-                                featureFlags = featureFlags,
-                            )
-                            .keyguardInteractor,
-                    featureFlags = featureFlags,
-                    manager = manager,
-                    headlessSystemUserMode = headlessSystemUserMode,
-                    applicationScope = testScope.backgroundScope,
-                    telephonyInteractor =
-                        TelephonyInteractor(repository = FakeTelephonyRepository()),
-                    broadcastDispatcher = fakeBroadcastDispatcher,
-                    keyguardUpdateMonitor = keyguardUpdateMonitor,
-                    backgroundDispatcher = testDispatcher,
-                    mainDispatcher = testDispatcher,
-                    activityManager = activityManager,
-                    refreshUsersScheduler = refreshUsersScheduler,
-                    guestUserInteractor = guestUserInteractor,
-                    uiEventLogger = uiEventLogger,
-                    userRestrictionChecker = mock(),
-                    processWrapper = ProcessWrapperFake(activityManager),
-                    userLogoutInteractor = userLogoutInteractor,
-                )
-        )
+        userSwitcherInteractor =
+            UserSwitcherInteractor(
+                applicationContext = context,
+                repository = userRepository,
+                activityStarter = activityStarter,
+                keyguardInteractor =
+                    KeyguardInteractorFactory.create(
+                            context = context,
+                            featureFlags = featureFlags,
+                        )
+                        .keyguardInteractor,
+                featureFlags = featureFlags,
+                manager = manager,
+                headlessSystemUserMode = headlessSystemUserMode,
+                applicationScope = testScope.backgroundScope,
+                telephonyInteractor =
+                    TelephonyInteractor(repository = FakeTelephonyRepository()),
+                broadcastDispatcher = fakeBroadcastDispatcher,
+                keyguardUpdateMonitor = keyguardUpdateMonitor,
+                backgroundDispatcher = testDispatcher,
+                mainDispatcher = testDispatcher,
+                activityManager = activityManager,
+                refreshUsersScheduler = refreshUsersScheduler,
+                guestUserInteractor = guestUserInteractor,
+                uiEventLogger = uiEventLogger,
+                userRestrictionChecker = mock(),
+                processWrapper = ProcessWrapperFake(activityManager),
+                userLogoutInteractor = userLogoutInteractor,
+            )
+        return StatusBarUserChipViewModel(interactor = userSwitcherInteractor)
     }
 
     private suspend fun setMultipleUsers() {

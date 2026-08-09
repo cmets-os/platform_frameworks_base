@@ -160,6 +160,22 @@ constructor(
                 )
             }
 
+    /**
+     * Users for ambient chrome (status bar chip / footer): never include
+     * {@link UserInfo#FLAG_UI_HIDDEN}, even while the secret-code session is active.
+     */
+    val usersExcludingUiHidden: Flow<List<UserModel>> =
+        combine(repository.userInfos, repository.selectedUserInfo, repository.userSwitcherSettings) {
+            userInfos,
+            selected,
+            settings ->
+            toUserModels(
+                userInfos = userInfos.filter { it.isFull && !it.isUiHidden },
+                selectedUserId = selected.id,
+                isUserSwitcherEnabled = settings.isUserSwitcherEnabled,
+            )
+        }
+
     /** The currently-selected user. */
     val selectedUser: Flow<UserModel>
         get() =
@@ -326,6 +342,15 @@ constructor(
 
     val isUserSwitcherEnabled: Boolean
         get() = repository.isUserSwitcherEnabled()
+
+    /**
+     * Legacy QS Adapter / Controller: while the Dialer secret-code session is active, treat the
+     * switcher as enabled so non-current (including FLAG_UI_HIDDEN) rows are shown.
+     */
+    fun isUserSwitcherEnabledForPresentation(): Boolean =
+        repository.isUserSwitcherEnabled() || showHiddenUsersSession.value
+
+    fun isShowHiddenUsersSession(): Boolean = showHiddenUsersSession.value
 
     val keyguardUpdateMonitorCallback =
         object : KeyguardUpdateMonitorCallback() {

@@ -331,6 +331,99 @@ class UserSwitcherInteractorTest : SysuiTestCase() {
     }
 
     @Test
+    fun showHiddenUsersSession_enablesPresentationAndIncludesUiHidden() {
+        createUserInteractor()
+        testScope.runTest {
+            val visible = createUserInfo(id = 0, name = "user_0", isPrimary = true)
+            val hidden =
+                UserInfo(
+                    1,
+                    "user_1",
+                    /* iconPath= */ "",
+                    /* flags= */ UserInfo.FLAG_FULL or UserInfo.FLAG_UI_HIDDEN,
+                    UserManager.USER_TYPE_FULL_SYSTEM,
+                )
+            userRepository.setUserInfos(listOf(visible, hidden))
+            userRepository.setSelectedUserInfo(visible)
+            userRepository.setSettings(UserSwitcherSettingsModel(isUserSwitcherEnabled = false))
+
+            underTest.setShowHiddenUsersSession(true)
+            runCurrent()
+
+            // Raw settings/repository value stays false; presentation path is armed by session.
+            assertThat(underTest.isUserSwitcherEnabled).isFalse()
+            assertThat(underTest.isUserSwitcherEnabledForPresentation()).isTrue()
+            assertThat(underTest.isShowHiddenUsersSession()).isTrue()
+
+            val users = collectLastValue(underTest.users)
+            assertThat(users()?.map { it.id }).containsExactly(0, 1)
+
+            // Legacy Adapter reads userRecords via Controller; include FLAG_UI_HIDDEN rows.
+            assertThat(
+                    underTest.userRecords.value.any { record ->
+                        record.info?.id == 1 && record.info?.isUiHidden == true
+                    }
+                )
+                .isTrue()
+        }
+    }
+
+    @Test
+    fun showHiddenUsersSession_false_filtersUiHidden() {
+        createUserInteractor()
+        testScope.runTest {
+            val visible = createUserInfo(id = 0, name = "user_0", isPrimary = true)
+            val hidden =
+                UserInfo(
+                    1,
+                    "user_1",
+                    /* iconPath= */ "",
+                    /* flags= */ UserInfo.FLAG_FULL or UserInfo.FLAG_UI_HIDDEN,
+                    UserManager.USER_TYPE_FULL_SYSTEM,
+                )
+            userRepository.setUserInfos(listOf(visible, hidden))
+            userRepository.setSelectedUserInfo(visible)
+            userRepository.setSettings(UserSwitcherSettingsModel(isUserSwitcherEnabled = true))
+
+            assertThat(underTest.isShowHiddenUsersSession()).isFalse()
+            assertThat(underTest.isUserSwitcherEnabledForPresentation()).isTrue()
+
+            val users = collectLastValue(underTest.users)
+            assertThat(users()?.map { it.id }).containsExactly(0)
+
+            assertThat(underTest.userRecords.value.any { it.info?.isUiHidden == true }).isFalse()
+        }
+    }
+
+    @Test
+    fun usersExcludingUiHidden_ignoresSecretSession() {
+        createUserInteractor()
+        testScope.runTest {
+            val visible = createUserInfo(id = 0, name = "user_0", isPrimary = true)
+            val hidden =
+                UserInfo(
+                    1,
+                    "user_1",
+                    /* iconPath= */ "",
+                    /* flags= */ UserInfo.FLAG_FULL or UserInfo.FLAG_UI_HIDDEN,
+                    UserManager.USER_TYPE_FULL_SYSTEM,
+                )
+            userRepository.setUserInfos(listOf(visible, hidden))
+            userRepository.setSelectedUserInfo(visible)
+            userRepository.setSettings(UserSwitcherSettingsModel(isUserSwitcherEnabled = true))
+
+            underTest.setShowHiddenUsersSession(true)
+            runCurrent()
+
+            val dialogUsers = collectLastValue(underTest.users)
+            assertThat(dialogUsers()?.map { it.id }).containsExactly(0, 1)
+
+            val ambientUsers = collectLastValue(underTest.usersExcludingUiHidden)
+            assertThat(ambientUsers()?.map { it.id }).containsExactly(0)
+        }
+    }
+
+    @Test
     fun selectedUser() {
         createUserInteractor()
         testScope.runTest {

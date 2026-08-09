@@ -39,6 +39,7 @@ constructor(private val userSwitcherInteractor: UserSwitcherInteractor) : Broadc
                 LAUNCH_USER_SWITCHER_DIALOG -> {
                     if (intent.getBooleanExtra(EXTRA_SHOW_HIDDEN_USERS, false)) {
                         userSwitcherInteractor.setShowHiddenUsersSession(true)
+                        userSwitcherInteractor.refreshUsers()
                     }
                     userSwitcherInteractor.showUserSwitcher(null, context)
                 }

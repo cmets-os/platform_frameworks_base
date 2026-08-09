@@ -39,7 +39,8 @@ constructor(private val interactor: UserSwitcherInteractor) {
         if (!chipEnabled) {
             flowOf(false)
         } else {
-            interactor.users.mapDirect { users -> users.size > 1 }
+            // Ambient chrome must ignore the secret-code session (no FLAG_UI_HIDDEN leak).
+            interactor.usersExcludingUiHidden.mapDirect { users -> users.size > 1 }
         }
 
     /** The display name of the current user */

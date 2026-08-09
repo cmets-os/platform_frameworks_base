@@ -71,7 +71,7 @@ constructor(
         get() = mUserSwitcherInteractor.isSimpleUserSwitcher
 
     val isUserSwitcherEnabled: Boolean
-        get() = mUserSwitcherInteractor.isUserSwitcherEnabled
+        get() = mUserSwitcherInteractor.isUserSwitcherEnabledForPresentation()
 
     /** The [UserRecord] of the current user or `null` when none. */
     val currentUserRecord: UserRecord?

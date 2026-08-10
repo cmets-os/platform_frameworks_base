@@ -45,17 +45,19 @@ public final class ScreenshotSaveLocation {
                 ExtSettings.SCREENSHOT_SAVE_LOCATION.get(context, owner.getIdentifier()));
     }
 
+    /** Whether Shared encrypted storage is opted-in for {@code owner}. */
+    public static boolean isSharedOptedIn(Context context, UserHandle owner) {
+        final UserManager userManager = context.getSystemService(UserManager.class);
+        return userManager != null
+                && userManager.isSharedEncryptedStorageEnabled(owner.getIdentifier());
+    }
+
     /**
      * True when Shared save is selected for {@code owner}, Shared encrypted storage is enabled
      * for that user, and Shared storage is currently unlocked.
      */
     public static boolean shouldSaveToShared(Context context, UserHandle owner) {
-        if (!isSharedSelected(context, owner)) {
-            return false;
-        }
-        final int userId = owner.getIdentifier();
-        final UserManager userManager = context.getSystemService(UserManager.class);
-        if (userManager == null || !userManager.isSharedEncryptedStorageEnabled(userId)) {
+        if (!isSharedSelected(context, owner) || !isSharedOptedIn(context, owner)) {
             return false;
         }
         final StorageManager storageManager = context.getSystemService(StorageManager.class);

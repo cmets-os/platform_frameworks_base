@@ -200,8 +200,21 @@ public class ImageExporter {
      */
     public ListenableFuture<Result> export(Executor executor, UUID requestId, Bitmap bitmap,
             ZonedDateTime captureTime, UserHandle owner, int displayId) {
+        return export(executor, requestId, bitmap, captureTime, owner, displayId,
+                false /* saveToShared */);
+    }
+
+    /**
+     * Export the image to MediaStore and publish.
+     *
+     * @param saveToShared when true, write under
+     *                     {@link ScreenshotSaveLocation#SHARED_SCREENSHOTS_PATH}
+     */
+    public ListenableFuture<Result> export(Executor executor, UUID requestId, Bitmap bitmap,
+            ZonedDateTime captureTime, UserHandle owner, int displayId, boolean saveToShared) {
         return export(executor, new Task(mResolver, requestId, bitmap, captureTime, mCompressFormat,
-                mQuality, owner, createFilename(captureTime, mCompressFormat, displayId)));
+                mQuality, owner, createFilename(captureTime, mCompressFormat, displayId),
+                false /* allowOverwrite */, null /* customSaveUri */, saveToShared));
     }
 
     /**

@@ -507,10 +507,14 @@ internal constructor(
         finisher: Consumer<Uri?>,
         onResult: Consumer<ImageExporter.Result>,
     ) {
-        val sharedSelected =
-            ScreenshotSaveLocation.isSharedSelected(context, screenshot.userHandle)
         val wantShared =
             ScreenshotSaveLocation.shouldSaveToShared(context, screenshot.userHandle)
+        // Notify only when Shared is actively desired but unavailable (opted-in + locked) or
+        // MediaStore Shared insert fell back — not when the Secure value is stale after opt-out.
+        val sharedDesiredButUnavailable =
+            ScreenshotSaveLocation.isSharedSelected(context, screenshot.userHandle) &&
+                ScreenshotSaveLocation.isSharedOptedIn(context, screenshot.userHandle) &&
+                !wantShared
         val future =
             imageExporter.export(
                 bgExecutor,
@@ -533,7 +537,7 @@ internal constructor(
                         customSaveUri != null &&
                             !result.uri.toString().startsWith(customSaveUri.toString())
                     val notifySharedFallback =
-                        (sharedSelected && !wantShared) || result.fellBackFromShared
+                        sharedDesiredButUnavailable || result.fellBackFromShared
                     if (notifySharedFallback || customSaveFellBack) {
                         val customFolderName =
                             when {

@@ -57,6 +57,7 @@ import com.android.systemui.screenshot.ActionIntentExecutor;
 import com.android.systemui.screenshot.ImageExporter;
 import com.android.systemui.screenshot.LogConfig;
 import com.android.systemui.screenshot.ScreenshotEvent;
+import com.android.systemui.screenshot.ScreenshotSaveLocation;
 import com.android.systemui.screenshot.scroll.CropView.CropBoundary;
 import com.android.systemui.screenshot.scroll.ScrollCaptureController.LongScreenshot;
 
@@ -451,9 +452,11 @@ public class LongScreenshotActivity extends Activity {
 
         mOutputBitmap = renderBitmap(drawable, bounds);
         // TODO(b/298931528): Add support for long screenshot on external displays.
+        final boolean saveToShared = ScreenshotSaveLocation.shouldSaveToShared(
+                this, mScreenshotUserHandle);
         ListenableFuture<ImageExporter.Result> exportFuture = mImageExporter.export(
                 mBackgroundExecutor, UUID.randomUUID(), mOutputBitmap, ZonedDateTime.now(),
-                mScreenshotUserHandle, Display.DEFAULT_DISPLAY);
+                mScreenshotUserHandle, Display.DEFAULT_DISPLAY, saveToShared);
         exportFuture.addListener(() -> onExportCompleted(action, exportFuture), mUiExecutor);
     }
 

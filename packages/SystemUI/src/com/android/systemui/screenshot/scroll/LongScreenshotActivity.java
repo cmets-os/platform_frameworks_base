@@ -42,6 +42,7 @@ import android.view.ScrollCaptureResponse;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.view.WindowCompat;
@@ -454,14 +455,21 @@ public class LongScreenshotActivity extends Activity {
         // TODO(b/298931528): Add support for long screenshot on external displays.
         final boolean saveToShared = ScreenshotSaveLocation.shouldSaveToShared(
                 this, mScreenshotUserHandle);
+        final boolean sharedDesiredButUnavailable =
+                ScreenshotSaveLocation.isSharedSelected(this, mScreenshotUserHandle)
+                        && ScreenshotSaveLocation.isSharedOptedIn(this, mScreenshotUserHandle)
+                        && !saveToShared;
         ListenableFuture<ImageExporter.Result> exportFuture = mImageExporter.export(
                 mBackgroundExecutor, UUID.randomUUID(), mOutputBitmap, ZonedDateTime.now(),
                 mScreenshotUserHandle, Display.DEFAULT_DISPLAY, saveToShared);
-        exportFuture.addListener(() -> onExportCompleted(action, exportFuture), mUiExecutor);
+        exportFuture.addListener(
+                () -> onExportCompleted(action, exportFuture, sharedDesiredButUnavailable),
+                mUiExecutor);
     }
 
     private void onExportCompleted(PendingAction action,
-            ListenableFuture<ImageExporter.Result> exportFuture) {
+            ListenableFuture<ImageExporter.Result> exportFuture,
+            boolean sharedDesiredButUnavailable) {
         setButtonsEnabled(true);
         ImageExporter.Result result;
         try {
@@ -469,6 +477,11 @@ public class LongScreenshotActivity extends Activity {
         } catch (CancellationException | InterruptedException | ExecutionException e) {
             Log.e(TAG, "failed to export", e);
             return;
+        }
+        if (sharedDesiredButUnavailable || result.fellBackFromShared) {
+            Toast.makeText(this,
+                    getString(R.string.screenshot_custom_uri_save_fail_message, "Shared"),
+                    Toast.LENGTH_LONG).show();
         }
         if (deleteAfterScrollCapture() && mOriginalScreenshotUri != null
                 && !Uri.EMPTY.equals(mOriginalScreenshotUri)) {

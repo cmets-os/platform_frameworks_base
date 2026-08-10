@@ -531,10 +531,12 @@ internal constructor(
                     val result = future.get()
                     Log.d(TAG, "Saved screenshot: $result")
 
-                    // Signifies custom SAF save failed & saved to default folder instead
+                    // SAF custom URI failed → MediaStore. Skip this toast when Shared was also
+                    // requested and succeeded (URI won't be under the Documents tree).
                     val customSaveUri = screenshot.customSaveUri
                     val customSaveFellBack =
                         customSaveUri != null &&
+                            !wantShared &&
                             !result.uri.toString().startsWith(customSaveUri.toString())
                     val notifySharedFallback =
                         sharedDesiredButUnavailable || result.fellBackFromShared

@@ -534,12 +534,16 @@ internal constructor(
                     // SAF custom URI failed → MediaStore. Skip this toast when Shared was also
                     // requested and succeeded (URI won't be under the Documents tree).
                     val customSaveUri = screenshot.customSaveUri
-                    val customSaveFellBack =
+                    val customSaveSucceeded =
                         customSaveUri != null &&
-                            !wantShared &&
-                            !result.uri.toString().startsWith(customSaveUri.toString())
+                            result.uri != null &&
+                            result.uri.toString().startsWith(customSaveUri.toString())
+                    val customSaveFellBack =
+                        customSaveUri != null && !wantShared && !customSaveSucceeded
+                    // Don't warn about Shared when large-screen SAF actually saved the image.
                     val notifySharedFallback =
-                        sharedDesiredButUnavailable || result.fellBackFromShared
+                        !customSaveSucceeded &&
+                            (sharedDesiredButUnavailable || result.fellBackFromShared)
                     if (notifySharedFallback || customSaveFellBack) {
                         val customFolderName =
                             when {

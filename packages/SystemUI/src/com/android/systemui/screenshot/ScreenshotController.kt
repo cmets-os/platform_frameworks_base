@@ -507,26 +507,19 @@ internal constructor(
         finisher: Consumer<Uri?>,
         onResult: Consumer<ImageExporter.Result>,
     ) {
-        var screenshotToSave = screenshot
-        var notifySharedUnavailable = false
-        if (screenshot.customSaveUri == null) {
-            val sharedUri =
-                ScreenshotSaveLocation.resolveSharedSaveUri(context, screenshot.userHandle)
-            if (sharedUri != null) {
-                screenshotToSave = screenshot.copy(customSaveUri = sharedUri)
-            } else if (ScreenshotSaveLocation.isSharedSelected(context, screenshot.userHandle)) {
-                // Shared preferred but opted-out / locked / unresolved → MediaStore + notify
-                notifySharedUnavailable = true
-            }
-        }
+        val sharedSelected =
+            ScreenshotSaveLocation.isSharedSelected(context, screenshot.userHandle)
+        val wantShared =
+            ScreenshotSaveLocation.shouldSaveToShared(context, screenshot.userHandle)
         val future =
             imageExporter.export(
                 bgExecutor,
                 requestId,
-                screenshotToSave.bitmap,
-                screenshotToSave.userHandle,
+                screenshot.bitmap,
+                screenshot.userHandle,
                 display.displayId,
-                screenshotToSave.customSaveUri,
+                screenshot.customSaveUri,
+                wantShared,
             )
         future.addListener(
             {
@@ -534,14 +527,17 @@ internal constructor(
                     val result = future.get()
                     Log.d(TAG, "Saved screenshot: $result")
 
-                    // Signifies custom save failed & saved to default folder instead
-                    val customSaveUri = screenshotToSave.customSaveUri
+                    // Signifies custom SAF save failed & saved to default folder instead
+                    val customSaveUri = screenshot.customSaveUri
                     val customSaveFellBack =
                         customSaveUri != null &&
                             !result.uri.toString().startsWith(customSaveUri.toString())
-                    if (notifySharedUnavailable || customSaveFellBack) {
+                    val notifySharedFallback =
+                        (sharedSelected && !wantShared) || result.fellBackFromShared
+                    if (notifySharedFallback || customSaveFellBack) {
                         val customFolderName =
                             when {
+                                notifySharedFallback -> SHARED_FALLBACK_FOLDER_NAME
                                 customSaveUri != null ->
                                     customSaveUri.lastPathSegment
                                         ?.split(":")
@@ -564,7 +560,7 @@ internal constructor(
                         notificationController.notifyCustomUriSaveError(defaultSaveErrorText)
                     }
 
-                    logScreenshotResultStatus(result.uri, screenshotToSave.userHandle)
+                    logScreenshotResultStatus(result.uri, screenshot.userHandle)
                     onResult.accept(result)
                     if (LogConfig.DEBUG_CALLBACK) {
                         Log.d(TAG, "finished bg processing, calling back with uri: ${result.uri}")

@@ -227,11 +227,28 @@ public class ImageExporter {
      */
     public ListenableFuture<Result> export(Executor executor, UUID requestId, Bitmap bitmap,
             UserHandle owner, int displayId, @Nullable Uri customSaveUri) {
+        return export(executor, requestId, bitmap, owner, displayId, customSaveUri,
+                false /* saveToShared */);
+    }
+
+    /**
+     * Export the image to MediaStore and publish.
+     *
+     * @param executor      the thread for execution
+     * @param bitmap        the bitmap to export
+     * @param customSaveUri A specific Uri to save the image to, must be a DocumentsContract URI
+     *                      (large-screen SAF picker). Ignored for Shared destination.
+     * @param saveToShared  when true, write under {@link ScreenshotSaveLocation#SHARED_SCREENSHOTS_PATH}
+     *                      via MediaStore (falls back to Pictures/Screenshots on insert failure)
+     * @return a listenable future result
+     */
+    public ListenableFuture<Result> export(Executor executor, UUID requestId, Bitmap bitmap,
+            UserHandle owner, int displayId, @Nullable Uri customSaveUri, boolean saveToShared) {
         ZonedDateTime captureTime = ZonedDateTime.now(ZoneId.systemDefault());
         return export(executor,
                 new Task(mResolver, requestId, bitmap, captureTime, mCompressFormat,
                         mQuality, owner, createFilename(captureTime, mCompressFormat, displayId),
-                        false, customSaveUri));
+                        false, customSaveUri, saveToShared));
     }
 
     /**
@@ -267,6 +284,8 @@ public class ImageExporter {
         public String fileName;
         public long timestamp;
         public CompressFormat format;
+        /** True when Shared MediaStore insert failed and Pictures/Screenshots was used instead. */
+        public boolean fellBackFromShared;
 
         @Override
         public String toString() {
@@ -276,6 +295,7 @@ public class ImageExporter {
             sb.append(", fileName='").append(fileName).append('\'');
             sb.append(", timestamp=").append(timestamp);
             sb.append(", format=").append(format);
+            sb.append(", fellBackFromShared=").append(fellBackFromShared);
             sb.append('}');
             return sb.toString();
         }
@@ -291,6 +311,7 @@ public class ImageExporter {
         private final UserHandle mOwner;
         private final String mFileName;
         private final Uri mCustomSaveUri;
+        private final boolean mSaveToShared;
 
         /**
          * This variable specifies the behavior when a file to be exported has a same name and
@@ -304,12 +325,19 @@ public class ImageExporter {
         Task(ContentResolver resolver, UUID requestId, Bitmap bitmap, ZonedDateTime captureTime,
                 CompressFormat format, int quality, UserHandle owner, String fileName) {
             this(resolver, requestId, bitmap, captureTime, format, quality, owner, fileName,
-                    false /* allowOverwrite */, null /* customSaveUri */);
+                    false /* allowOverwrite */, null /* customSaveUri */, false /* saveToShared */);
         }
 
         Task(ContentResolver resolver, UUID requestId, Bitmap bitmap, ZonedDateTime captureTime,
                 CompressFormat format, int quality, UserHandle owner,
                 String fileName, boolean allowOverwrite, Uri customSaveUri) {
+            this(resolver, requestId, bitmap, captureTime, format, quality, owner, fileName,
+                    allowOverwrite, customSaveUri, false /* saveToShared */);
+        }
+
+        Task(ContentResolver resolver, UUID requestId, Bitmap bitmap, ZonedDateTime captureTime,
+                CompressFormat format, int quality, UserHandle owner,
+                String fileName, boolean allowOverwrite, Uri customSaveUri, boolean saveToShared) {
             mResolver = resolver;
             mRequestId = requestId;
             mBitmap = bitmap;
@@ -320,6 +348,7 @@ public class ImageExporter {
             mFileName = fileName;
             mAllowOverwrite = allowOverwrite;
             mCustomSaveUri = customSaveUri;
+            mSaveToShared = saveToShared;
         }
 
         /**
@@ -338,6 +367,7 @@ public class ImageExporter {
             Uri uri = null;
             Instant start = null;
             Result result = new Result();
+            boolean fellBackFromShared = false;
 
             if (LogConfig.DEBUG_STORAGE) {
                 Log.d(TAG, "image export started");
@@ -345,16 +375,15 @@ public class ImageExporter {
             }
 
             try {
-                // Custom DocumentsContract URI: large-screen SAF picker, or Shared/Screenshots.
+                // Custom DocumentsContract URI: large-screen SAF picker only.
                 final boolean useCustomDocumentsSave = mCustomSaveUri != null
-                        && (Flags.largeScreenScreenshotSaveLocation()
-                        || ScreenshotSaveLocation.isSharedTreeUri(mCustomSaveUri));
+                        && Flags.largeScreenScreenshotSaveLocation();
                 // Private Space (and other non-current owners) need the owner's ContentResolver.
                 final ContentResolver documentsResolver = useCustomDocumentsSave
                         ? resolverAsUser(mResolver, mOwner) : mResolver;
                 if (useCustomDocumentsSave) {
                     try {
-                        // If using custom URI from SAF / Shared, use DocumentsContract.
+                        // If using custom URI from SAF, use DocumentsContract.
                         String mimeType = getMimeType(mFormat);
                         Uri customDocumentsContractUri =
                                 DocumentsContract.buildDocumentUriUsingTree(
@@ -380,8 +409,22 @@ public class ImageExporter {
                     if (mCustomSaveUri != null) {
                         customUriSaveFailed = true;
                     }
-                    uri = createEntry(mResolver, mFormat, mCaptureTime, mFileName, mOwner,
-                            mAllowOverwrite);
+                    if (mSaveToShared) {
+                        try {
+                            uri = createEntry(mResolver, mFormat, mCaptureTime, mFileName, mOwner,
+                                    mAllowOverwrite,
+                                    ScreenshotSaveLocation.SHARED_SCREENSHOTS_PATH);
+                        } catch (ImageExportException e) {
+                            Log.w(TAG, "Shared MediaStore insert failed; "
+                                    + "falling back to default save location.", e);
+                            fellBackFromShared = true;
+                            uri = createEntry(mResolver, mFormat, mCaptureTime, mFileName, mOwner,
+                                    mAllowOverwrite, SCREENSHOTS_PATH);
+                        }
+                    } else {
+                        uri = createEntry(mResolver, mFormat, mCaptureTime, mFileName, mOwner,
+                                mAllowOverwrite, SCREENSHOTS_PATH);
+                    }
                 } else {
                     writeResolver = documentsResolver;
                 }
@@ -404,6 +447,7 @@ public class ImageExporter {
                 result.uri = uri;
                 result.fileName = mFileName;
                 result.format = mFormat;
+                result.fellBackFromShared = fellBackFromShared;
 
                 if (LogConfig.DEBUG_STORAGE) {
                     Log.d(TAG, "image export completed: "
@@ -428,10 +472,10 @@ public class ImageExporter {
 
     private static Uri createEntry(ContentResolver resolver, CompressFormat format,
             ZonedDateTime time, String fileName, UserHandle owner,
-            boolean allowOverwrite) throws ImageExportException {
+            boolean allowOverwrite, String relativePath) throws ImageExportException {
         Trace.beginSection("ImageExporter_createEntry");
         try {
-            final ContentValues values = createMetadata(time, format, fileName);
+            final ContentValues values = createMetadata(time, format, fileName, relativePath);
 
             Uri baseUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
             Uri uriWithUserId = ContentProvider.maybeAddUserId(baseUri, owner.getIdentifier());
@@ -569,8 +613,13 @@ public class ImageExporter {
 
     static ContentValues createMetadata(ZonedDateTime captureTime, CompressFormat format,
             String fileName) {
+        return createMetadata(captureTime, format, fileName, SCREENSHOTS_PATH);
+    }
+
+    static ContentValues createMetadata(ZonedDateTime captureTime, CompressFormat format,
+            String fileName, String relativePath) {
         ContentValues values = new ContentValues();
-        values.put(MediaStore.MediaColumns.RELATIVE_PATH, SCREENSHOTS_PATH);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
         values.put(MediaStore.MediaColumns.MIME_TYPE, getMimeType(format));
         values.put(MediaStore.MediaColumns.DATE_ADDED, captureTime.toEpochSecond());

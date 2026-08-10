@@ -389,7 +389,9 @@ public class ImageExporter {
 
             try {
                 // Custom DocumentsContract URI: large-screen SAF picker only.
+                // Shared destination takes precedence over a concurrent SAF tree URI.
                 final boolean useCustomDocumentsSave = mCustomSaveUri != null
+                        && !mSaveToShared
                         && Flags.largeScreenScreenshotSaveLocation();
                 // Private Space (and other non-current owners) need the owner's ContentResolver.
                 final ContentResolver documentsResolver = useCustomDocumentsSave

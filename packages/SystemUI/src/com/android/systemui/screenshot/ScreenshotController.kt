@@ -507,14 +507,26 @@ internal constructor(
         finisher: Consumer<Uri?>,
         onResult: Consumer<ImageExporter.Result>,
     ) {
+        var screenshotToSave = screenshot
+        var notifySharedUnavailable = false
+        if (screenshot.customSaveUri == null) {
+            val sharedUri =
+                ScreenshotSaveLocation.resolveSharedSaveUri(context, screenshot.userHandle)
+            if (sharedUri != null) {
+                screenshotToSave = screenshot.copy(customSaveUri = sharedUri)
+            } else if (ScreenshotSaveLocation.isSharedSelected(context, screenshot.userHandle)) {
+                // Shared preferred but opted-out / locked / unresolved → MediaStore + notify
+                notifySharedUnavailable = true
+            }
+        }
         val future =
             imageExporter.export(
                 bgExecutor,
                 requestId,
-                screenshot.bitmap,
-                screenshot.userHandle,
+                screenshotToSave.bitmap,
+                screenshotToSave.userHandle,
                 display.displayId,
-                screenshot.customSaveUri,
+                screenshotToSave.customSaveUri,
             )
         future.addListener(
             {
@@ -523,23 +535,27 @@ internal constructor(
                     Log.d(TAG, "Saved screenshot: $result")
 
                     // Signifies custom save failed & saved to default folder instead
-                    if (
-                        screenshot.customSaveUri != null &&
-                            !result.uri.toString().startsWith(screenshot.customSaveUri.toString())
-                    ) {
+                    val customSaveUri = screenshotToSave.customSaveUri
+                    val customSaveFellBack =
+                        customSaveUri != null &&
+                            !result.uri.toString().startsWith(customSaveUri.toString())
+                    if (notifySharedUnavailable || customSaveFellBack) {
                         val customFolderName =
-                            screenshot.customSaveUri.lastPathSegment
-                                ?.split(":")
-                                ?.last()
-                                ?.split("/")
-                                ?.last()
-                                ?.let {
-                                    if (it.length > 15) {
-                                        "${it.take(15)}…"
-                                    } else {
-                                        it
-                                    }
+                            when {
+                                customSaveUri != null ->
+                                    customSaveUri.lastPathSegment
+                                        ?.split(":")
+                                        ?.last()
+                                        ?.split("/")
+                                        ?.last()
+                                else -> SHARED_FALLBACK_FOLDER_NAME
+                            }?.let {
+                                if (it.length > 15) {
+                                    "${it.take(15)}…"
+                                } else {
+                                    it
                                 }
+                            } ?: SHARED_FALLBACK_FOLDER_NAME
                         val defaultSaveErrorText =
                             context.getString(
                                 R.string.screenshot_custom_uri_save_fail_message,
@@ -548,7 +564,7 @@ internal constructor(
                         notificationController.notifyCustomUriSaveError(defaultSaveErrorText)
                     }
 
-                    logScreenshotResultStatus(result.uri, screenshot.userHandle)
+                    logScreenshotResultStatus(result.uri, screenshotToSave.userHandle)
                     onResult.accept(result)
                     if (LogConfig.DEBUG_CALLBACK) {
                         Log.d(TAG, "finished bg processing, calling back with uri: ${result.uri}")
@@ -610,6 +626,8 @@ internal constructor(
 
         // From WizardManagerHelper.java
         private const val SETTINGS_SECURE_USER_SETUP_COMPLETE = "user_setup_complete"
+
+        private const val SHARED_FALLBACK_FOLDER_NAME = "Shared"
 
         const val SCREENSHOT_CORNER_DEFAULT_TIMEOUT_MILLIS: Int = 6000
 

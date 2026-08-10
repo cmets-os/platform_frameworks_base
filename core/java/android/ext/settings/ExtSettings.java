@@ -2,6 +2,7 @@ package android.ext.settings;
 
 import android.annotation.BoolRes;
 import android.annotation.IntegerRes;
+import android.annotation.NonNull;
 import android.annotation.StringRes;
 import android.content.Context;
 import android.provider.Settings;
@@ -37,6 +38,18 @@ public class ExtSettings {
 
     public static final BoolSetting SCREENSHOT_TIMESTAMP_EXIF = new BoolSetting(
             Setting.Scope.PER_USER, Settings.Secure.SCREENSHOT_TIMESTAMP_EXIF, false);
+
+    /**
+     * Where to save screenshots for a user: {@code default} ({@code Pictures/Screenshots}) or
+     * {@code shared} ({@code Shared/Screenshots} when Shared encrypted storage is available).
+     */
+    public static final StringSetting SCREENSHOT_SAVE_LOCATION = new StringSetting(
+            Setting.Scope.PER_USER, Settings.Secure.SCREENSHOT_SAVE_LOCATION, "default") {
+        @Override
+        public boolean validateValue(@NonNull String val) {
+            return "default".equals(val) || "shared".equals(val);
+        }
+    };
 
     public static final BoolSetting SCRAMBLE_LOCKSCREEN_PIN_LAYOUT_PRIMARY = new BoolSetting(
             Setting.Scope.PER_USER, Settings.Secure.SCRAMBLE_PIN_LAYOUT_PRIMARY, false);

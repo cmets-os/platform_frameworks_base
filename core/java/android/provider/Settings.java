@@ -7502,6 +7502,13 @@ public final class Settings {
         @Protected(read = KnownSystemPackage.SYSTEM_UI, readWrite = KnownSystemPackage.SETTINGS)
         public static final String SCREENSHOT_TIMESTAMP_EXIF = "screenshot_timestamp_exif";
 
+        /**
+         * Per-user screenshot save location: {@code default} or {@code shared}.
+         * @hide
+         */
+        @Protected(read = KnownSystemPackage.SYSTEM_UI, readWrite = KnownSystemPackage.SETTINGS)
+        public static final String SCREENSHOT_SAVE_LOCATION = "screenshot_save_location";
+
         /** @hide */
         @Protected(read = KnownSystemPackage.SYSTEM_UI, readWrite = KnownSystemPackage.SETTINGS)
         public static final String SCRAMBLE_PIN_LAYOUT_PRIMARY =

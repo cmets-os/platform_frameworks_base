@@ -23,6 +23,7 @@ import android.content.ContentProvider;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
 import android.ext.settings.ExtSettings;
 import android.graphics.Bitmap;
@@ -344,17 +345,22 @@ public class ImageExporter {
             }
 
             try {
-                // For now, only limiting saving to custom save URI to large screen screenshots,
-                // where URI will a DocumentsContract URI coming from the SAF picker
-                if (mCustomSaveUri != null && Flags.largeScreenScreenshotSaveLocation()) {
+                // Custom DocumentsContract URI: large-screen SAF picker, or Shared/Screenshots.
+                final boolean useCustomDocumentsSave = mCustomSaveUri != null
+                        && (Flags.largeScreenScreenshotSaveLocation()
+                        || ScreenshotSaveLocation.isSharedTreeUri(mCustomSaveUri));
+                // Private Space (and other non-current owners) need the owner's ContentResolver.
+                final ContentResolver documentsResolver = useCustomDocumentsSave
+                        ? resolverAsUser(mResolver, mOwner) : mResolver;
+                if (useCustomDocumentsSave) {
                     try {
-                        // If using custom URI from SAF, use DocumentsContract to prepare file path.
+                        // If using custom URI from SAF / Shared, use DocumentsContract.
                         String mimeType = getMimeType(mFormat);
                         Uri customDocumentsContractUri =
                                 DocumentsContract.buildDocumentUriUsingTree(
                                         mCustomSaveUri,
                                         DocumentsContract.getTreeDocumentId(mCustomSaveUri));
-                        uri = DocumentsContract.createDocument(mResolver,
+                        uri = DocumentsContract.createDocument(documentsResolver,
                                 customDocumentsContractUri,
                                 mimeType, mFileName);
                         if (uri == null) {
@@ -367,6 +373,7 @@ public class ImageExporter {
                 }
 
                 boolean customUriSaveFailed = false;
+                ContentResolver writeResolver = mResolver;
 
                 // If not saving to a valid custom uri, we create using MediaStore
                 if (uri == null) {
@@ -375,15 +382,17 @@ public class ImageExporter {
                     }
                     uri = createEntry(mResolver, mFormat, mCaptureTime, mFileName, mOwner,
                             mAllowOverwrite);
+                } else {
+                    writeResolver = documentsResolver;
                 }
                 throwIfInterrupted();
 
-                writeImage(mResolver, mBitmap, mFormat, mQuality, uri);
+                writeImage(writeResolver, mBitmap, mFormat, mQuality, uri);
                 throwIfInterrupted();
 
                 int width = mBitmap.getWidth();
                 int height = mBitmap.getHeight();
-                writeExif(mResolver, uri, mRequestId, width, height, mCaptureTime);
+                writeExif(writeResolver, uri, mRequestId, width, height, mCaptureTime);
                 throwIfInterrupted();
 
                 if (mCustomSaveUri == null || customUriSaveFailed) {
@@ -619,6 +628,19 @@ public class ImageExporter {
                 return "webp";
             default:
                 throw new IllegalArgumentException("Unknown CompressFormat!");
+        }
+    }
+
+    private static ContentResolver resolverAsUser(ContentResolver resolver, UserHandle owner) {
+        final Context context = resolver.getContext();
+        if (context == null) {
+            return resolver;
+        }
+        try {
+            return context.createContextAsUser(owner, 0).getContentResolver();
+        } catch (Exception e) {
+            Log.w(TAG, "createContextAsUser failed for " + owner + "; using default resolver", e);
+            return resolver;
         }
     }
 
